@@ -1,0 +1,70 @@
+#![no_std]
+
+use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env};
+
+/// Storage key namespaces (placeholders for future data layout).
+mod keys {
+    pub const OWNER: &[u8] = b"REG_OWNER";     // namehash -> Address
+    pub const RESOLVER: &[u8] = b"REG_RESOLV";  // namehash -> Address
+    pub const EXPIRES: &[u8] = b"REG_EXPIRE";   // namehash -> u64
+    pub const FLAGS: &[u8] = b"REG_FLAGS";      // namehash -> u32 (bitflags)
+}
+
+/// Event payload types (expand as needed).
+#[derive(Clone)]
+#[contracttype]
+pub struct EvtTransfer {
+    pub namehash: BytesN<32>,
+    pub from: Address,
+    pub to: Address,
+}
+
+#[derive(Clone)]
+#[contracttype]
+pub struct EvtResolverChanged {
+    pub namehash: BytesN<32>,
+    pub resolver: Address,
+}
+
+#[derive(Clone)]
+#[contracttype]
+pub struct EvtRenew {
+    pub namehash: BytesN<32>,
+    pub expires_at: u64,
+}
+
+#[contract]
+pub struct Registry;
+
+/// Minimal, compilable interface. Add real logic later.
+#[contractimpl]
+impl Registry {
+    /// Trivial function so the contract exports at least one method.
+    pub fn version(_env: Env) -> u32 {
+        1
+    }
+
+    // --- Stubs to be implemented later ---
+    // pub fn set_owner(env: Env, namehash: BytesN<32>, new_owner: Address) { ... }
+    // pub fn set_resolver(env: Env, namehash: BytesN<32>, resolver: Address) { ... }
+    // pub fn transfer(env: Env, namehash: BytesN<32>, to: Address) { ... }
+    // pub fn renew(env: Env, namehash: BytesN<32>) { ... }
+    // pub fn owner(env: Env, namehash: BytesN<32>) -> Address { ... }
+    // pub fn resolver(env: Env, namehash: BytesN<32>) -> Address { ... }
+    // pub fn expires(env: Env, namehash: BytesN<32>) -> u64 { ... }
+    // pub fn namehash(env: Env, labels: Vec<Bytes>) -> BytesN<32> { ... }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::Env;
+
+    #[test]
+    fn it_compiles_and_returns_version() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+        assert_eq!(client.version(), 1);
+    }
+}

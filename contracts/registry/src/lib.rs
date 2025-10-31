@@ -36,6 +36,12 @@ pub struct EvtRenew {
 #[contract]
 pub struct Registry;
 
+#[derive(Clone)]
+#[contracttype]
+enum DataKey {
+    Owner(BytesN<32>),
+}
+
 /// Minimal, compilable interface. Add real logic later.
 #[contractimpl]
 impl Registry {

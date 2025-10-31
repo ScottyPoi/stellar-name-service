@@ -1,0 +1,1 @@
+React app to search/resolve names, register via commit–reveal, manage records/subnames.

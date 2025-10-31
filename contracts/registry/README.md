@@ -1,0 +1,1 @@
+Soroban Registry contract that maps `namehash` → `{ owner, resolver, expires_at, flags }`.

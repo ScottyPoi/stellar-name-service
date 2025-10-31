@@ -1,0 +1,38 @@
+# =========================================================
+# Soroban Configuration for Stellar Name Service
+# =========================================================
+# This file defines available networks and account aliases
+# for use by the `soroban` CLI and your Justfile.
+# You can override any section with env vars or CLI flags.
+# ---------------------------------------------------------
+
+[global]
+# Default network for all commands (sandbox or testnet)
+network = "sandbox"
+# Default keypair to sign transactions; replace later.
+identity = "default"
+
+# ---------------------------------------------------------
+# Local sandbox network (runs locally on your machine)
+# ---------------------------------------------------------
+[network.sandbox]
+rpc_url = "http://localhost:8000/soroban/rpc"
+# automatically started/stopped by `soroban network start/clean sandbox`
+
+# ---------------------------------------------------------
+# Stellar public testnet configuration
+# ---------------------------------------------------------
+[network.testnet]
+rpc_url = "https://soroban-testnet.stellar.org"
+# friendbot for funding accounts (only on testnet)
+friendbot_url = "https://friendbot.stellar.org"
+# public horizon endpoint for legacy queries
+horizon_url = "https://horizon-testnet.stellar.org"
+
+# ---------------------------------------------------------
+# Identities (keypairs for signing transactions)
+# ---------------------------------------------------------
+[identity.default]
+# A temporary sandbox-only key automatically generated.
+# Replace this with your own if you deploy to testnet.
+seed_phrase = "sandbox"

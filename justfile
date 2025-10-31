@@ -32,7 +32,7 @@ test:
     cargo test --workspace
 
 # Run tests for a single crate
-test crate:
+test-crate crate:
     cargo test -p {{crate}}
 
 check:
@@ -47,7 +47,7 @@ clean:
 # --- Soroban CLI commands ---
 # You can use `--network sandbox` (local) or `--network testnet`
 # Modify NETWORK variable below if you want a default.
-set NETWORK := "sandbox"
+NETWORK := "sandbox"
 
 # Build contract to Wasm (output to target/wasm32-unknown-unknown/release/)
 build-contract crate:

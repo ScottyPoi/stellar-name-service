@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "contracts/registry",
+  "contracts/resolver",
+]
+resolver = "2"

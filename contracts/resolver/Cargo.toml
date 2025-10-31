@@ -1,0 +1,16 @@
+[package]
+name = "resolver"
+version = "0.1.0"
+edition = "2021"
+license = "MIT-0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Align this version with your installed soroban-cli (same major/minor).
+soroban-sdk = { version = "23", default-features = false }
+
+[dev-dependencies]
+soroban-sdk = { version = "23", default-features = false, features = ["testutils"] }

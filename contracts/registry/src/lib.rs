@@ -143,4 +143,44 @@ mod tests {
         assert_eq!(client.owner(&namehash), owner);
     }
 
+    #[test]
+    fn set_owner_requires_current_owner() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[2u8; 32]);
+        let owner = Address::generate(&e);
+        let attacker = Address::generate(&e);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        let attempted_takeover = catch_unwind(AssertUnwindSafe(|| {
+            client
+                .mock_auths(&[MockAuth {
+                    address: &attacker,
+                    invoke: &MockAuthInvoke {
+                        contract: &id,
+                        fn_name: "set_owner",
+                        args: (&namehash, &attacker).into_val(&e),
+                        sub_invokes: &[],
+                    },
+                }])
+                .set_owner(&namehash, &attacker);
+        }));
+
+        assert!(attempted_takeover.is_err());
+        assert_eq!(client.owner(&namehash), owner);
+    }
+
 }

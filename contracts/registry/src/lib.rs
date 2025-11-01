@@ -160,7 +160,7 @@ impl Registry {
 mod tests {
     use super::*;
     use soroban_sdk::{
-        testutils::{Address as _, MockAuth, MockAuthInvoke},
+        testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
         IntoVal, Env,
     };
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -331,5 +331,152 @@ mod tests {
         assert!(result.is_err());
         let stored = e.as_contract(&id, || Registry::read_resolver(&e, &namehash));
         assert!(stored.is_none());
+    }
+
+    #[test]
+    fn renew_sets_initial_expiry() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[6u8; 32]);
+        let owner = Address::generate(&e);
+        let now = 1_700_000_000u64;
+        e.ledger().set_timestamp(now);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "renew",
+                    args: (&namehash,).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .renew(&namehash);
+
+        let expiry = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
+        assert_eq!(expiry, now + RENEW_EXTENSION_SECONDS);
+    }
+
+    #[test]
+    fn renew_extends_existing_expiry_from_current_value() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[7u8; 32]);
+        let owner = Address::generate(&e);
+
+        let first_now = 500u64;
+        e.ledger().set_timestamp(first_now);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "renew",
+                    args: (&namehash,).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .renew(&namehash);
+
+        let first_expiry = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
+
+        let second_now = first_now + RENEW_EXTENSION_SECONDS / 2;
+        e.ledger().set_timestamp(second_now);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "renew",
+                    args: (&namehash,).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .renew(&namehash);
+
+        let second_expiry = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
+
+        assert_eq!(second_expiry, first_expiry + RENEW_EXTENSION_SECONDS);
+        assert!(second_expiry > second_now);
+    }
+
+    #[test]
+    fn renew_requires_owner_auth() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[8u8; 32]);
+        let owner = Address::generate(&e);
+        let attacker = Address::generate(&e);
+
+        e.ledger().set_timestamp(1_234_567u64);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        let attempt = catch_unwind(AssertUnwindSafe(|| {
+            client
+                .mock_auths(&[MockAuth {
+                    address: &attacker,
+                    invoke: &MockAuthInvoke {
+                        contract: &id,
+                        fn_name: "renew",
+                        args: (&namehash,).into_val(&e),
+                        sub_invokes: &[],
+                    },
+                }])
+                .renew(&namehash);
+        }));
+
+        assert!(attempt.is_err());
+        let expiry = e.as_contract(&id, || Registry::read_expires(&e, &namehash));
+        assert!(expiry.is_none());
     }
 }

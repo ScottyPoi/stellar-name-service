@@ -105,7 +105,11 @@ impl Registry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::Env;
+    use soroban_sdk::{
+        testutils::{Address as _, MockAuth, MockAuthInvoke},
+        IntoVal, Env,
+    };
+    use std::panic::{catch_unwind, AssertUnwindSafe};
 
     #[test]
     fn it_compiles_and_returns_version() {
@@ -114,4 +118,29 @@ mod tests {
         let client = RegistryClient::new(&e, &id);
         assert_eq!(client.version(), 1);
     }
+
+    #[test]
+    fn set_owner_persists_owner() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[1u8; 32]);
+        let owner = Address::generate(&e);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        assert_eq!(client.owner(&namehash), owner);
+    }
+
 }

@@ -3,7 +3,9 @@
 #[cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, BytesN, Env};
+use soroban_sdk::{
+    contract, contractevent, contractimpl, contracttype, Address, Bytes, BytesN, Env, Vec,
+};
 
 const RENEW_EXTENSION_SECONDS: u64 = 31_536_000;
 
@@ -155,6 +157,17 @@ impl Registry {
 
     pub fn expires(env: Env, namehash: BytesN<32>) -> u64 {
         Self::read_expires(&env, &namehash).unwrap_or_else(|| panic!("expiry not set"))
+    }
+
+    pub fn namehash(env: Env, labels: Vec<Bytes>) -> BytesN<32> {
+        let mut node = BytesN::<32>::from_array(&env, &[0u8; 32]);
+        for label in labels.iter() {
+            let label_hash = env.crypto().sha256(&label).to_bytes();
+            let mut data = Bytes::from_slice(&env, &node.to_array());
+            data.extend_from_slice(&label_hash.to_array());
+            node = env.crypto().sha256(&data).to_bytes();
+        }
+        node
     }
 }
 

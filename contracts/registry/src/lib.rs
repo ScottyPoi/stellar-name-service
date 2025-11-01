@@ -102,11 +102,23 @@ impl Registry {
         current_owner.require_auth();
         Self::set_owner(env, namehash, to);
     }
-    // pub fn set_resolver(env: Env, namehash: BytesN<32>, resolver: Address) { ... }
+
+    pub fn set_resolver(env: Env, namehash: BytesN<32>, resolver: Address) {
+        let owner =
+            Self::read_owner(&env, &namehash).unwrap_or_else(|| panic!("owner not set"));
+        owner.require_auth();
+        env.storage()
+            .persistent()
+            .set(&DataKey::Resolver(namehash.clone()), &resolver);
+        EvtResolverChanged { namehash, resolver }.publish(&env);
+    }
     // pub fn transfer(env: Env, namehash: BytesN<32>, to: Address) { ... }
     // pub fn renew(env: Env, namehash: BytesN<32>) { ... }
     // pub fn owner(env: Env, namehash: BytesN<32>) -> Address { ... }
-    // pub fn resolver(env: Env, namehash: BytesN<32>) -> Address { ... }
+    pub fn resolver(env: Env, namehash: BytesN<32>) -> Address {
+        Self::read_resolver(&env, &namehash).unwrap_or_else(|| panic!("resolver not set"))
+    }
+
     // pub fn expires(env: Env, namehash: BytesN<32>) -> u64 { ... }
     // pub fn namehash(env: Env, labels: Vec<Bytes>) -> BytesN<32> { ... }
 }

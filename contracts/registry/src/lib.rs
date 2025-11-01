@@ -1,6 +1,9 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env};
+#[cfg(test)]
+extern crate std;
+
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env};
 
 /// Storage key namespaces (placeholders for future data layout).
 mod keys {
@@ -48,6 +51,12 @@ impl Registry {
     /// Trivial function so the contract exports at least one method.
     pub fn version(_env: Env) -> u32 {
         1
+    }
+
+    fn read_owner(env: &Env, namehash: &BytesN<32>) -> Option<Address> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Owner(namehash.clone()))
     }
 
     // --- Stubs to be implemented later ---

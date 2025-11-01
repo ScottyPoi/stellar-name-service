@@ -182,8 +182,8 @@ impl Registry {
 mod tests {
     use super::*;
     use soroban_sdk::{
-        testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
-        vec, Bytes, Env, IntoVal, Vec as SorobanVec,
+        testutils::{Address as _, Events, Ledger, MockAuth, MockAuthInvoke},
+        vec, Bytes, Env, IntoVal, Map, Symbol, TryFromVal, Vec as SorobanVec,
     };
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn set_owner_persists_owner() {
+    fn owner_can_set_new_owner() {
         let e = Env::default();
         let id = e.register(Registry, ());
         let client = RegistryClient::new(&e, &id);
@@ -220,7 +220,155 @@ mod tests {
     }
 
     #[test]
-    fn set_owner_requires_current_owner() {
+    fn owner_set_emits_transfer_event() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[10u8; 32]);
+        let owner = Address::generate(&e);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        let events = e.events().all();
+        let mut found = false;
+        for idx in 0..events.len() {
+            let (event_contract, event_topics, event_data) = events.get(idx).unwrap();
+            if event_contract != id {
+                continue;
+            }
+
+            let topic_symbol =
+                Symbol::try_from_val(&e, &event_topics.get(0).unwrap()).unwrap();
+            if topic_symbol != Symbol::new(&e, "transfer") {
+                continue;
+            }
+
+            let topic_namehash =
+                BytesN::<32>::try_from_val(&e, &event_topics.get(1).unwrap()).unwrap();
+            assert_eq!(topic_namehash, namehash);
+
+            let data_map =
+                Map::<Symbol, Address>::try_from_val(&e, &event_data).unwrap();
+            let from = data_map.get(Symbol::new(&e, "from")).unwrap();
+            let to = data_map.get(Symbol::new(&e, "to")).unwrap();
+            assert_eq!(from, owner);
+            assert_eq!(to, owner);
+
+            found = true;
+        }
+
+        assert!(found, "expected transfer event on set_owner");
+    }
+
+    #[test]
+    fn transfer_emits_transfer_event() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[11u8; 32]);
+        let owner = Address::generate(&e);
+        let recipient = Address::generate(&e);
+
+        client.set_owner(&namehash, &owner);
+        client.transfer(&namehash, &recipient);
+
+        let events = e.events().all();
+        let mut found = false;
+        for idx in 0..events.len() {
+            let (event_contract, event_topics, event_data) = events.get(idx).unwrap();
+            if event_contract != id {
+                continue;
+            }
+            let topic_symbol =
+                Symbol::try_from_val(&e, &event_topics.get(0).unwrap()).unwrap();
+            if topic_symbol != Symbol::new(&e, "transfer") {
+                continue;
+            }
+            let topic_namehash =
+                BytesN::<32>::try_from_val(&e, &event_topics.get(1).unwrap()).unwrap();
+            if topic_namehash != namehash {
+                continue;
+            }
+            let data_map =
+                Map::<Symbol, Address>::try_from_val(&e, &event_data).unwrap();
+            let from = data_map.get(Symbol::new(&e, "from")).unwrap();
+            let to = data_map.get(Symbol::new(&e, "to")).unwrap();
+            if from == owner && to == recipient {
+                found = true;
+                break;
+            }
+        }
+
+        assert!(found, "expected transfer event on transfer");
+    }
+
+    #[test]
+    fn transfer_to_self_noop() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[12u8; 32]);
+        let owner = Address::generate(&e);
+
+        client.set_owner(&namehash, &owner);
+        client.transfer(&namehash, &owner);
+
+        assert_eq!(client.owner(&namehash), owner);
+    }
+
+    #[test]
+    fn uninitialized_namehash_transfer_panics() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[13u8; 32]);
+        let recipient = Address::generate(&e);
+
+        let result = catch_unwind(AssertUnwindSafe(|| client.transfer(&namehash, &recipient)));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn ownership_isolation_between_namehashes() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash_a = BytesN::from_array(&e, &[14u8; 32]);
+        let namehash_b = BytesN::from_array(&e, &[15u8; 32]);
+        let owner_a = Address::generate(&e);
+        let owner_b = Address::generate(&e);
+        let new_owner_a = Address::generate(&e);
+
+        client.set_owner(&namehash_a, &owner_a);
+        client.set_owner(&namehash_b, &owner_b);
+
+        client.transfer(&namehash_a, &new_owner_a);
+
+        assert_eq!(client.owner(&namehash_a), new_owner_a);
+        assert_eq!(client.owner(&namehash_b), owner_b);
+    }
+
+    #[test]
+    fn owner_rejects_non_owner_update() {
         let e = Env::default();
         let id = e.register(Registry, ());
         let client = RegistryClient::new(&e, &id);
@@ -260,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn transfer_updates_owner() {
+    fn transfer_updates_owner_correctly() {
         let e = Env::default();
         e.mock_all_auths();
         let id = e.register(Registry, ());
@@ -433,6 +581,17 @@ mod tests {
         labels.push_back(long_label);
 
         let result = catch_unwind(AssertUnwindSafe(|| Registry::namehash(e.clone(), labels)));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn owner_default_panics() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+        let namehash = BytesN::from_array(&e, &[9u8; 32]);
+
+        let result = catch_unwind(AssertUnwindSafe(|| client.owner(&namehash)));
         assert!(result.is_err());
     }
 

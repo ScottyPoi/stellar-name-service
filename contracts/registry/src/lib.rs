@@ -112,9 +112,7 @@ impl Registry {
             .set(&DataKey::Resolver(namehash.clone()), &resolver);
         EvtResolverChanged { namehash, resolver }.publish(&env);
     }
-    // pub fn transfer(env: Env, namehash: BytesN<32>, to: Address) { ... }
-    // pub fn renew(env: Env, namehash: BytesN<32>) { ... }
-    // pub fn owner(env: Env, namehash: BytesN<32>) -> Address { ... }
+
     pub fn resolver(env: Env, namehash: BytesN<32>) -> Address {
         Self::read_resolver(&env, &namehash).unwrap_or_else(|| panic!("resolver not set"))
     }

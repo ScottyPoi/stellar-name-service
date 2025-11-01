@@ -5,6 +5,8 @@ extern crate std;
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, BytesN, Env};
 
+const RENEW_EXTENSION_SECONDS: u64 = 31_536_000;
+
 /// Storage key namespaces (placeholders for future data layout).
 mod keys {
     pub const OWNER: &[u8] = b"REG_OWNER";     // namehash -> Address
@@ -123,6 +125,33 @@ impl Registry {
         Self::read_resolver(&env, &namehash).unwrap_or_else(|| panic!("resolver not set"))
     }
 
+    pub fn renew(env: Env, namehash: BytesN<32>) {
+        let owner =
+            Self::read_owner(&env, &namehash).unwrap_or_else(|| panic!("owner not set"));
+        owner.require_auth();
+
+        let now = env.ledger().timestamp();
+        let current_expiry = Self::read_expires(&env, &namehash).unwrap_or(now);
+        let base = if current_expiry > now {
+            current_expiry
+        } else {
+            now
+        };
+
+        let new_expiry = base
+            .checked_add(RENEW_EXTENSION_SECONDS)
+            .unwrap_or_else(|| panic!("expiry overflow"));
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Expires(namehash.clone()), &new_expiry);
+
+        EvtRenew {
+            namehash,
+            expires_at: new_expiry,
+        }
+        .publish(&env);
+    }
     // pub fn expires(env: Env, namehash: BytesN<32>) -> u64 { ... }
     // pub fn namehash(env: Env, labels: Vec<Bytes>) -> BytesN<32> { ... }
 }

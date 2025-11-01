@@ -183,4 +183,20 @@ mod tests {
         assert_eq!(client.owner(&namehash), owner);
     }
 
+    #[test]
+    fn transfer_updates_owner() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[3u8; 32]);
+        let owner = Address::generate(&e);
+        let recipient = Address::generate(&e);
+
+        client.set_owner(&namehash, &owner);
+        client.transfer(&namehash, &recipient);
+
+        assert_eq!(client.owner(&namehash), recipient);
+    }
 }

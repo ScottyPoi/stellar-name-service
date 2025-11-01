@@ -152,8 +152,10 @@ impl Registry {
         }
         .publish(&env);
     }
-    // pub fn expires(env: Env, namehash: BytesN<32>) -> u64 { ... }
-    // pub fn namehash(env: Env, labels: Vec<Bytes>) -> BytesN<32> { ... }
+
+    pub fn expires(env: Env, namehash: BytesN<32>) -> u64 {
+        Self::read_expires(&env, &namehash).unwrap_or_else(|| panic!("expiry not set"))
+    }
 }
 
 #[cfg(test)]

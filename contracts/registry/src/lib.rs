@@ -425,7 +425,7 @@ mod tests {
     }
 
     #[test]
-    fn set_resolver_persists_resolver() {
+    fn resolver_owner_can_set() {
         let e = Env::default();
         let id = e.register(Registry, ());
         let client = RegistryClient::new(&e, &id);
@@ -462,7 +462,197 @@ mod tests {
     }
 
     #[test]
-    fn set_resolver_requires_owner_auth() {
+    fn resolver_set_emits_event() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[21u8; 32]);
+        let owner = Address::generate(&e);
+        let resolver = Address::generate(&e);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_resolver",
+                    args: (&namehash, &resolver).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_resolver(&namehash, &resolver);
+
+        let events = e.events().all();
+        let mut found = false;
+        for idx in 0..events.len() {
+            let (event_contract, event_topics, event_data) = events.get(idx).unwrap();
+            if event_contract != id {
+                continue;
+            }
+            let topic_symbol =
+                Symbol::try_from_val(&e, &event_topics.get(0).unwrap()).unwrap();
+            if topic_symbol != Symbol::new(&e, "resolver_changed") {
+                continue;
+            }
+            let topic_namehash =
+                BytesN::<32>::try_from_val(&e, &event_topics.get(1).unwrap()).unwrap();
+            if topic_namehash != namehash {
+                continue;
+            }
+            let data_map =
+                Map::<Symbol, Address>::try_from_val(&e, &event_data).unwrap();
+            let resolver_record = data_map.get(Symbol::new(&e, "resolver")).unwrap();
+            assert_eq!(resolver_record, resolver);
+            found = true;
+            break;
+        }
+       assert!(found, "expected resolver_changed event");
+   }
+
+    #[test]
+    fn resolver_idempotent_same_value() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[22u8; 32]);
+        let owner = Address::generate(&e);
+        let resolver = Address::generate(&e);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_resolver",
+                    args: (&namehash, &resolver).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_resolver(&namehash, &resolver);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_resolver",
+                    args: (&namehash, &resolver).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_resolver(&namehash, &resolver);
+
+        assert_eq!(client.resolver(&namehash), resolver);
+    }
+
+    #[test]
+    fn resolver_isolation_between_namehashes() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash_a = BytesN::from_array(&e, &[23u8; 32]);
+        let namehash_b = BytesN::from_array(&e, &[24u8; 32]);
+        let owner_a = Address::generate(&e);
+        let owner_b = Address::generate(&e);
+        let resolver_a1 = Address::generate(&e);
+        let resolver_a2 = Address::generate(&e);
+        let resolver_b = Address::generate(&e);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner_a,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash_a, &owner_a).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash_a, &owner_a);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner_b,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash_b, &owner_b).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash_b, &owner_b);
+
+        // Set resolvers
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner_a,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_resolver",
+                    args: (&namehash_a, &resolver_a1).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_resolver(&namehash_a, &resolver_a1);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner_b,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_resolver",
+                    args: (&namehash_b, &resolver_b).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_resolver(&namehash_b, &resolver_b);
+
+        // Update resolver for A
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner_a,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_resolver",
+                    args: (&namehash_a, &resolver_a2).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_resolver(&namehash_a, &resolver_a2);
+
+        assert_eq!(client.resolver(&namehash_a), resolver_a2);
+        assert_eq!(client.resolver(&namehash_b), resolver_b);
+    }
+
+    #[test]
+    fn resolver_rejects_non_owner() {
         let e = Env::default();
         let id = e.register(Registry, ());
         let client = RegistryClient::new(&e, &id);
@@ -592,6 +782,17 @@ mod tests {
         let namehash = BytesN::from_array(&e, &[9u8; 32]);
 
         let result = catch_unwind(AssertUnwindSafe(|| client.owner(&namehash)));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn resolver_default_panics() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+        let namehash = BytesN::from_array(&e, &[20u8; 32]);
+
+        let result = catch_unwind(AssertUnwindSafe(|| client.resolver(&namehash)));
         assert!(result.is_err());
     }
 

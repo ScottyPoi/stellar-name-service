@@ -8,6 +8,7 @@ use soroban_sdk::{
 };
 
 const RENEW_EXTENSION_SECONDS: u64 = 31_536_000;
+const MAX_LABEL_LENGTH: u32 = 63;
 
 /// Storage key namespaces (placeholders for future data layout).
 mod keys {
@@ -162,6 +163,12 @@ impl Registry {
     pub fn namehash(env: Env, labels: Vec<Bytes>) -> BytesN<32> {
         let mut node = BytesN::<32>::from_array(&env, &[0u8; 32]);
         for label in labels.iter() {
+            if label.len() == 0 {
+                panic!("empty label");
+            }
+            if label.len() > MAX_LABEL_LENGTH {
+                panic!("label too long");
+            }
             let label_hash = env.crypto().sha256(&label).to_bytes();
             let mut data = Bytes::from_slice(&env, &node.to_array());
             data.extend_from_slice(&label_hash.to_array());

@@ -47,6 +47,7 @@ pub struct Registry;
 enum DataKey {
     Owner(BytesN<32>),
     Resolver(BytesN<32>),
+    Expires(BytesN<32>),
 }
 
 /// Minimal, compilable interface. Add real logic later.
@@ -69,6 +70,11 @@ impl Registry {
             .get(&DataKey::Resolver(namehash.clone()))
     }
 
+    pub(crate) fn read_expires(env: &Env, namehash: &BytesN<32>) -> Option<u64> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Expires(namehash.clone()))
+    }
 
     // --- Stubs to be implemented later ---
     pub fn set_owner(env: Env, namehash: BytesN<32>, new_owner: Address) {

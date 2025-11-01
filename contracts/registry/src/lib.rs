@@ -87,6 +87,12 @@ impl Registry {
         Self::read_owner(&env, &namehash).unwrap_or_else(|| panic!("owner not set"))
     }
 
+    pub fn transfer(env: Env, namehash: BytesN<32>, to: Address) {
+        let current_owner =
+            Self::read_owner(&env, &namehash).unwrap_or_else(|| panic!("owner not set"));
+        current_owner.require_auth();
+        Self::set_owner(env, namehash, to);
+    }
     // pub fn set_resolver(env: Env, namehash: BytesN<32>, resolver: Address) { ... }
     // pub fn transfer(env: Env, namehash: BytesN<32>, to: Address) { ... }
     // pub fn renew(env: Env, namehash: BytesN<32>) { ... }

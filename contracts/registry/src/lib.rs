@@ -46,6 +46,7 @@ pub struct Registry;
 #[contracttype]
 enum DataKey {
     Owner(BytesN<32>),
+    Resolver(BytesN<32>),
 }
 
 /// Minimal, compilable interface. Add real logic later.
@@ -61,6 +62,13 @@ impl Registry {
             .persistent()
             .get(&DataKey::Owner(namehash.clone()))
     }
+
+    pub(crate) fn read_resolver(env: &Env, namehash: &BytesN<32>) -> Option<Address> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Resolver(namehash.clone()))
+    }
+
 
     // --- Stubs to be implemented later ---
     pub fn set_owner(env: Env, namehash: BytesN<32>, new_owner: Address) {

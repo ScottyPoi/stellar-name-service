@@ -183,7 +183,7 @@ mod tests {
     use super::*;
     use soroban_sdk::{
         testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
-        IntoVal, Env,
+        vec, Bytes, Env, IntoVal, Vec as SorobanVec,
     };
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -353,6 +353,87 @@ mod tests {
         assert!(result.is_err());
         let stored = e.as_contract(&id, || Registry::read_resolver(&e, &namehash));
         assert!(stored.is_none());
+    }
+
+    #[test]
+    fn namehash_root_is_zero() {
+        let e = Env::default();
+        let labels: SorobanVec<Bytes> = vec![&e];
+        let hash = Registry::namehash(e.clone(), labels);
+        assert_eq!(hash.to_array(), [0u8; 32]);
+    }
+
+    #[test]
+    fn namehash_single_label_deterministic() {
+        let e = Env::default();
+        let label = Bytes::from_slice(&e, b"stellar");
+
+        let mut labels_a = vec![&e];
+        labels_a.push_back(label.clone());
+        let hash_a = Registry::namehash(e.clone(), labels_a);
+
+        let mut labels_b = vec![&e];
+        labels_b.push_back(label);
+        let hash_b = Registry::namehash(e.clone(), labels_b);
+
+        assert_eq!(hash_a, hash_b);
+    }
+
+    #[test]
+    fn namehash_multiple_labels_order_sensitive() {
+        let e = Env::default();
+
+        let mut labels_one = vec![&e];
+        labels_one.push_back(Bytes::from_slice(&e, b"foo"));
+        labels_one.push_back(Bytes::from_slice(&e, b"bar"));
+        let hash_one = Registry::namehash(e.clone(), labels_one);
+
+        let mut labels_two = vec![&e];
+        labels_two.push_back(Bytes::from_slice(&e, b"bar"));
+        labels_two.push_back(Bytes::from_slice(&e, b"foo"));
+        let hash_two = Registry::namehash(e.clone(), labels_two);
+
+        assert_ne!(hash_one, hash_two);
+    }
+
+    #[test]
+    fn namehash_unicode_utf8_stability() {
+        let e = Env::default();
+        let unicode_label = "stêllar🚀";
+
+        let mut labels_one = vec![&e];
+        labels_one.push_back(Bytes::from_slice(&e, unicode_label.as_bytes()));
+        let hash_one = Registry::namehash(e.clone(), labels_one);
+
+        let mut labels_two = vec![&e];
+        labels_two.push_back(Bytes::from_slice(&e, unicode_label.as_bytes()));
+        let hash_two = Registry::namehash(e.clone(), labels_two);
+
+        assert_eq!(hash_one, hash_two);
+    }
+
+    #[test]
+    fn namehash_rejects_empty_label() {
+        let e = Env::default();
+        let mut labels = vec![&e];
+        labels.push_back(Bytes::new(&e));
+
+        let result = catch_unwind(AssertUnwindSafe(|| Registry::namehash(e.clone(), labels)));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn namehash_rejects_overlong_label() {
+        let e = Env::default();
+        let mut labels = vec![&e];
+        let long_label_bytes: std::vec::Vec<u8> = core::iter::repeat(b'a')
+            .take((MAX_LABEL_LENGTH + 1) as usize)
+            .collect();
+        let long_label = Bytes::from_slice(&e, &long_label_bytes);
+        labels.push_back(long_label);
+
+        let result = catch_unwind(AssertUnwindSafe(|| Registry::namehash(e.clone(), labels)));
+        assert!(result.is_err());
     }
 
     #[test]

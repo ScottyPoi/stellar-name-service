@@ -3,7 +3,7 @@
 #[cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env};
+use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, BytesN, Env};
 
 /// Storage key namespaces (placeholders for future data layout).
 mod keys {
@@ -15,23 +15,26 @@ mod keys {
 
 /// Event payload types (expand as needed).
 #[derive(Clone)]
-#[contracttype]
+#[contractevent(topics = ["transfer"])]
 pub struct EvtTransfer {
+    #[topic]
     pub namehash: BytesN<32>,
     pub from: Address,
     pub to: Address,
 }
 
 #[derive(Clone)]
-#[contracttype]
+#[contractevent(topics = ["resolver_changed"])]
 pub struct EvtResolverChanged {
+    #[topic]
     pub namehash: BytesN<32>,
     pub resolver: Address,
 }
 
 #[derive(Clone)]
-#[contracttype]
+#[contractevent(topics = ["renew"])]
 pub struct EvtRenew {
+    #[topic]
     pub namehash: BytesN<32>,
     pub expires_at: u64,
 }
@@ -73,14 +76,12 @@ impl Registry {
         env.storage().persistent().set(&key, &new_owner);
 
         let from = current_owner.unwrap_or_else(|| new_owner.clone());
-        let transfer_evt = EvtTransfer {
+        EvtTransfer {
             namehash,
             from,
             to: new_owner,
-        };
-
-        env.events()
-            .publish((symbol_short!("transfer"), transfer_evt.namehash.clone()), transfer_evt);
+        }
+        .publish(&env);
     }
 
     pub fn owner(env: Env, namehash: BytesN<32>) -> Address {

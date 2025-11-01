@@ -82,6 +82,11 @@ impl Registry {
         env.events()
             .publish((symbol_short!("transfer"), transfer_evt.namehash.clone()), transfer_evt);
     }
+
+    pub fn owner(env: Env, namehash: BytesN<32>) -> Address {
+        Self::read_owner(&env, &namehash).unwrap_or_else(|| panic!("owner not set"))
+    }
+
     // pub fn set_resolver(env: Env, namehash: BytesN<32>, resolver: Address) { ... }
     // pub fn transfer(env: Env, namehash: BytesN<32>, to: Address) { ... }
     // pub fn renew(env: Env, namehash: BytesN<32>) { ... }

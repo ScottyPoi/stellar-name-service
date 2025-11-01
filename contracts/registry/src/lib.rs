@@ -253,4 +253,83 @@ mod tests {
 
         assert_eq!(client.owner(&namehash), recipient);
     }
+
+    #[test]
+    fn set_resolver_persists_resolver() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[4u8; 32]);
+        let owner = Address::generate(&e);
+        let resolver = Address::generate(&e);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_resolver",
+                    args: (&namehash, &resolver).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_resolver(&namehash, &resolver);
+
+        assert_eq!(client.resolver(&namehash), resolver);
+    }
+
+    #[test]
+    fn set_resolver_requires_owner_auth() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[5u8; 32]);
+        let owner = Address::generate(&e);
+        let attacker = Address::generate(&e);
+        let resolver = Address::generate(&e);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            client
+                .mock_auths(&[MockAuth {
+                    address: &attacker,
+                    invoke: &MockAuthInvoke {
+                        contract: &id,
+                        fn_name: "set_resolver",
+                        args: (&namehash, &resolver).into_val(&e),
+                        sub_invokes: &[],
+                    },
+                }])
+                .set_resolver(&namehash, &resolver);
+        }));
+
+        assert!(result.is_err());
+        let stored = e.as_contract(&id, || Registry::read_resolver(&e, &namehash));
+        assert!(stored.is_none());
+    }
 }

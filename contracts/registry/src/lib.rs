@@ -60,7 +60,28 @@ impl Registry {
     }
 
     // --- Stubs to be implemented later ---
-    // pub fn set_owner(env: Env, namehash: BytesN<32>, new_owner: Address) { ... }
+    pub fn set_owner(env: Env, namehash: BytesN<32>, new_owner: Address) {
+        let key = DataKey::Owner(namehash.clone());
+        let storage = env.storage().persistent();
+        let current_owner: Option<Address> = storage.get(&key);
+
+        match current_owner.as_ref() {
+            Some(owner) => owner.require_auth(),
+            None => new_owner.require_auth(),
+        }
+
+        env.storage().persistent().set(&key, &new_owner);
+
+        let from = current_owner.unwrap_or_else(|| new_owner.clone());
+        let transfer_evt = EvtTransfer {
+            namehash,
+            from,
+            to: new_owner,
+        };
+
+        env.events()
+            .publish((symbol_short!("transfer"), transfer_evt.namehash.clone()), transfer_evt);
+    }
     // pub fn set_resolver(env: Env, namehash: BytesN<32>, resolver: Address) { ... }
     // pub fn transfer(env: Env, namehash: BytesN<32>, to: Address) { ... }
     // pub fn renew(env: Env, namehash: BytesN<32>) { ... }

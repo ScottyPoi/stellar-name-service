@@ -1297,4 +1297,122 @@ mod tests {
             e.as_contract(&id, || Registry::read_resolver(&e, &namehash));
         assert!(stored.is_none(), "resolver should remain unset");
     }
+
+    #[test]
+    fn storage_keys_do_not_collide() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[19u8; 32]);
+        let owner = Address::generate(&e);
+        let resolver = Address::generate(&e);
+
+        // Initially nothing is stored.
+        assert!(
+            e.as_contract(&id, || Registry::read_owner(&e, &namehash)).is_none()
+        );
+        assert!(
+            e.as_contract(&id, || Registry::read_resolver(&e, &namehash)).is_none()
+        );
+        assert!(
+            e.as_contract(&id, || Registry::read_expires(&e, &namehash)).is_none()
+        );
+
+        client.set_owner(&namehash, &owner);
+        assert_eq!(
+            e.as_contract(&id, || Registry::read_owner(&e, &namehash)),
+            Some(owner.clone())
+        );
+        assert!(
+            e.as_contract(&id, || Registry::read_resolver(&e, &namehash)).is_none(),
+            "resolver slot should remain untouched after set_owner"
+        );
+        assert!(
+            e.as_contract(&id, || Registry::read_expires(&e, &namehash)).is_none(),
+            "expiry slot should remain untouched after set_owner"
+        );
+
+        client.set_resolver(&namehash, &resolver);
+        assert_eq!(
+            e.as_contract(&id, || Registry::read_resolver(&e, &namehash)),
+            Some(resolver.clone())
+        );
+        assert_eq!(
+            e.as_contract(&id, || Registry::read_owner(&e, &namehash)),
+            Some(owner.clone()),
+            "owner slot should remain intact after set_resolver"
+        );
+        assert!(
+            e.as_contract(&id, || Registry::read_expires(&e, &namehash)).is_none(),
+            "expiry slot should remain untouched after set_resolver"
+        );
+
+        let now = 555u64;
+        e.ledger().set_timestamp(now);
+        client.renew(&namehash);
+        let expected_expiry = now + RENEW_EXTENSION_SECONDS;
+        assert_eq!(
+            e.as_contract(&id, || Registry::read_expires(&e, &namehash)),
+            Some(expected_expiry),
+            "expiry slot should be written by renew"
+        );
+        assert_eq!(
+            e.as_contract(&id, || Registry::read_owner(&e, &namehash)),
+            Some(owner),
+            "owner slot should remain intact after renew"
+        );
+        assert_eq!(
+            e.as_contract(&id, || Registry::read_resolver(&e, &namehash)),
+            Some(resolver),
+            "resolver slot should remain intact after renew"
+        );
+    }
+
+    #[test]
+    fn unknown_namehash_returns_defaults() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let known = BytesN::from_array(&e, &[21u8; 32]);
+        let unknown = BytesN::from_array(&e, &[22u8; 32]);
+        let owner = Address::generate(&e);
+        let resolver = Address::generate(&e);
+
+        e.ledger().set_timestamp(1_000u64);
+        client.set_owner(&known, &owner);
+        client.set_resolver(&known, &resolver);
+        client.renew(&known);
+
+        assert!(
+            e.as_contract(&id, || Registry::read_owner(&e, &unknown)).is_none()
+        );
+        assert!(
+            e.as_contract(&id, || Registry::read_resolver(&e, &unknown)).is_none()
+        );
+        assert!(
+            e.as_contract(&id, || Registry::read_expires(&e, &unknown)).is_none()
+        );
+
+        let owner_call =
+            catch_unwind(AssertUnwindSafe(|| client.owner(&unknown)));
+        assert!(owner_call.is_err(), "owner() should panic for unknown namehash");
+
+        let resolver_call =
+            catch_unwind(AssertUnwindSafe(|| client.resolver(&unknown)));
+        assert!(
+            resolver_call.is_err(),
+            "resolver() should panic for unknown namehash"
+        );
+
+        let expires_call =
+            catch_unwind(AssertUnwindSafe(|| client.expires(&unknown)));
+        assert!(
+            expires_call.is_err(),
+            "expires() should panic for unknown namehash"
+        );
+    }
 }

@@ -9,6 +9,7 @@ use soroban_sdk::{
 
 const RENEW_EXTENSION_SECONDS: u64 = 31_536_000;
 const MAX_LABEL_LENGTH: u32 = 63;
+const ZERO_ACCOUNT_STR: &str = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 
 /// Storage key namespaces (placeholders for future data layout).
 mod keys {
@@ -63,6 +64,11 @@ impl Registry {
         1
     }
 
+    fn is_zero_account(env: &Env, address: &Address) -> bool {
+        let zero = Address::from_str(env, ZERO_ACCOUNT_STR);
+        address == &zero
+    }
+
     fn read_owner(env: &Env, namehash: &BytesN<32>) -> Option<Address> {
         env.storage()
             .persistent()
@@ -83,6 +89,9 @@ impl Registry {
 
     // --- Stubs to be implemented later ---
     pub fn set_owner(env: Env, namehash: BytesN<32>, new_owner: Address) {
+        if Self::is_zero_account(&env, &new_owner) {
+            panic!("zero owner not allowed");
+        }
         let key = DataKey::Owner(namehash.clone());
         let storage = env.storage().persistent();
         let current_owner: Option<Address> = storage.get(&key);
@@ -115,6 +124,9 @@ impl Registry {
     }
 
     pub fn set_resolver(env: Env, namehash: BytesN<32>, resolver: Address) {
+        if Self::is_zero_account(&env, &resolver) {
+            panic!("zero resolver not allowed");
+        }
         let owner =
             Self::read_owner(&env, &namehash).unwrap_or_else(|| panic!("owner not set"));
         owner.require_auth();
@@ -1204,5 +1216,85 @@ mod tests {
         );
         let map = Map::<Symbol, Address>::try_from_val(&e, &data).unwrap();
         assert_eq!(map.get(Symbol::new(&e, "resolver")).unwrap(), resolver);
+    }
+
+    #[test]
+    fn set_owner_rejects_zero_address() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[16u8; 32]);
+        let zero_owner =
+            Address::from_str(&e, "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
+
+        let outcome = catch_unwind(AssertUnwindSafe(|| {
+            client
+                .mock_auths(&[MockAuth {
+                    address: &zero_owner,
+                    invoke: &MockAuthInvoke {
+                        contract: &id,
+                        fn_name: "set_owner",
+                        args: (&namehash, &zero_owner).into_val(&e),
+                        sub_invokes: &[],
+                    },
+                }])
+                .set_owner(&namehash, &zero_owner);
+        }));
+        assert!(outcome.is_err(), "zero owner should be rejected");
+
+        let stored =
+            e.as_contract(&id, || Registry::read_owner(&e, &namehash));
+        assert!(stored.is_none(), "zero owner should not persist");
+    }
+
+    #[test]
+    fn set_resolver_rejects_zero_address() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[17u8; 32]);
+        let owner = Address::generate(&e);
+        let zero_address =
+            Address::from_str(&e, "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
+
+        client.set_owner(&namehash, &owner);
+
+        let outcome = catch_unwind(AssertUnwindSafe(|| {
+            client.set_resolver(&namehash, &zero_address);
+        }));
+        assert!(
+            outcome.is_err(),
+            "zero resolver should be rejected even for the owner"
+        );
+
+        let stored =
+            e.as_contract(&id, || Registry::read_resolver(&e, &namehash));
+        assert!(stored.is_none(), "zero resolver should not persist");
+    }
+
+    #[test]
+    fn set_resolver_without_owner_panics() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[18u8; 32]);
+        let resolver = Address::generate(&e);
+
+        let outcome = catch_unwind(AssertUnwindSafe(|| {
+            client.set_resolver(&namehash, &resolver);
+        }));
+        assert!(
+            outcome.is_err(),
+            "setting resolver without owner should panic"
+        );
+        let stored =
+            e.as_contract(&id, || Registry::read_resolver(&e, &namehash));
+        assert!(stored.is_none(), "resolver should remain unset");
     }
 }

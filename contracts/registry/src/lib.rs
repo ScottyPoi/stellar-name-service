@@ -175,7 +175,7 @@ impl Registry {
     pub fn namehash(env: Env, labels: Vec<Bytes>) -> BytesN<32> {
         let mut node = BytesN::<32>::from_array(&env, &[0u8; 32]);
         for label in labels.iter() {
-            if label.len() == 0 {
+            if label.is_empty() {
                 panic!("empty label");
             }
             if label.len() > MAX_LABEL_LENGTH {

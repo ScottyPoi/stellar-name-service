@@ -923,11 +923,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Renew event capture is inconsistent in the harness"]
-    fn renew_emits_event_with_new_expiry() {}
-
-    #[test]
-    fn renew_event_timestamp_matches_state() {
+    fn renew_emits_event_with_new_expiry() {
         let e = Env::default();
         e.mock_all_auths();
         let id = e.register(Registry, ());

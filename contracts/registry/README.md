@@ -34,7 +34,7 @@ Separate namespaces ensure that writes to one field do not collide with others. 
 | `resolver(namehash) -> Address` | Reads the resolver. | None | Panics if unset. |
 | `renew(namehash)` | Extends `expires_at` by the fixed interval (one year). Emits `renew`. | Current owner. | Panics if owner unset or expiry overflows `u64`. |
 | `expires(namehash) -> u64` | Reads the expiry timestamp. | None | Panics if unset. |
-| `namehash(labels: Vec<Bytes>) -> BytesN<32>` | Computes the hierarchical namehash helper used in tests. | None | Panics on empty labels or labels longer than 63 bytes. |
+| `namehash(labels: Vec<Bytes>) -> BytesN<32>` | Computes the hierarchical namehash for a name. Public utility function callable by any contract or client. | None | Panics on empty labels or labels longer than 63 bytes. |
 
 ### Authorization model
 

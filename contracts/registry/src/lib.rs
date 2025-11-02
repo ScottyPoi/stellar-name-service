@@ -1068,4 +1068,141 @@ mod tests {
         assert_eq!(expiry_b_after, expiry_b_before, "unrelated namehash changed");
         assert!(expiry_a_after >= expiry_b_after);
     }
+
+    #[test]
+    fn non_owner_cannot_mutate_fields() {
+        let e = Env::default();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[13u8; 32]);
+        let owner = Address::generate(&e);
+        let attacker = Address::generate(&e);
+        let resolver = Address::generate(&e);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &owner,
+                invoke: &MockAuthInvoke {
+                    contract: &id,
+                    fn_name: "set_owner",
+                    args: (&namehash, &owner).into_val(&e),
+                    sub_invokes: &[],
+                },
+            }])
+            .set_owner(&namehash, &owner);
+
+        let set_owner_attempt = catch_unwind(AssertUnwindSafe(|| {
+            client.set_owner(&namehash, &attacker);
+        }));
+        assert!(set_owner_attempt.is_err());
+        assert_eq!(client.owner(&namehash), owner);
+
+        let transfer_attempt = catch_unwind(AssertUnwindSafe(|| {
+            client.transfer(&namehash, &attacker);
+        }));
+        assert!(transfer_attempt.is_err());
+        assert_eq!(client.owner(&namehash), owner);
+
+        let resolver_attempt = catch_unwind(AssertUnwindSafe(|| {
+            client.set_resolver(&namehash, &resolver);
+        }));
+        assert!(resolver_attempt.is_err());
+        let resolver_state =
+            e.as_contract(&id, || Registry::read_resolver(&e, &namehash));
+        assert!(resolver_state.is_none());
+
+        let renew_attempt = catch_unwind(AssertUnwindSafe(|| {
+            client.renew(&namehash);
+        }));
+        assert!(renew_attempt.is_err());
+        let expires_state =
+            e.as_contract(&id, || Registry::read_expires(&e, &namehash));
+        assert!(expires_state.is_none());
+    }
+
+    #[test]
+    fn owner_can_mutate_all_fields() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[14u8; 32]);
+        let owner = Address::generate(&e);
+        let resolver1 = Address::generate(&e);
+        let new_owner = Address::generate(&e);
+        let resolver2 = Address::generate(&e);
+
+        let first_now = 10_000u64;
+        e.ledger().set_timestamp(first_now);
+
+        client.set_owner(&namehash, &owner);
+        client.set_resolver(&namehash, &resolver1);
+        client.transfer(&namehash, &new_owner);
+        client.set_resolver(&namehash, &resolver2);
+
+        let second_now = first_now + 1;
+        e.ledger().set_timestamp(second_now);
+
+        client.renew(&namehash);
+
+        assert_eq!(client.owner(&namehash), new_owner);
+        assert_eq!(client.resolver(&namehash), resolver2);
+        let expiry = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
+        assert_eq!(expiry, second_now + RENEW_EXTENSION_SECONDS);
+    }
+
+    #[test]
+    fn events_ordered_and_well_formed() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[15u8; 32]);
+        let owner = Address::generate(&e);
+        let new_owner = Address::generate(&e);
+        let resolver = Address::generate(&e);
+
+        client.set_owner(&namehash, &owner);
+        let events = e.events().all();
+        assert_eq!(events.len(), 1);
+        let (contract_id, topics, data) = events.get(0).unwrap().clone();
+        assert_eq!(contract_id, id);
+        assert_eq!(
+            Symbol::try_from_val(&e, &topics.get(0).unwrap()).unwrap(),
+            Symbol::new(&e, "transfer")
+        );
+        let map = Map::<Symbol, Address>::try_from_val(&e, &data).unwrap();
+        assert_eq!(map.get(Symbol::new(&e, "from")).unwrap(), owner);
+        assert_eq!(map.get(Symbol::new(&e, "to")).unwrap(), owner);
+
+        client.transfer(&namehash, &new_owner);
+        let events = e.events().all();
+        assert_eq!(events.len(), 1);
+        let (contract_id, topics, data) = events.get(0).unwrap().clone();
+        assert_eq!(contract_id, id);
+        assert_eq!(
+            Symbol::try_from_val(&e, &topics.get(0).unwrap()).unwrap(),
+            Symbol::new(&e, "transfer")
+        );
+        let map = Map::<Symbol, Address>::try_from_val(&e, &data).unwrap();
+        assert_eq!(map.get(Symbol::new(&e, "from")).unwrap(), owner);
+        assert_eq!(map.get(Symbol::new(&e, "to")).unwrap(), new_owner);
+
+        client.set_resolver(&namehash, &resolver);
+        let events = e.events().all();
+        assert_eq!(events.len(), 1);
+        let (contract_id, topics, data) = events.get(0).unwrap().clone();
+        assert_eq!(contract_id, id);
+        assert_eq!(
+            Symbol::try_from_val(&e, &topics.get(0).unwrap()).unwrap(),
+            Symbol::new(&e, "resolver_changed")
+        );
+        let map = Map::<Symbol, Address>::try_from_val(&e, &data).unwrap();
+        assert_eq!(map.get(Symbol::new(&e, "resolver")).unwrap(), resolver);
+    }
 }

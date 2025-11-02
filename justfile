@@ -28,8 +28,8 @@ default:
 build:
     cargo build --workspace
 
-test:
-    cargo test --workspace
+test *args:
+	if [ "{{args}}" = "" ]; then cargo test --workspace; else cargo test -p {{args}}; fi
 
 # Run tests for a single crate
 test-crate crate:

@@ -329,6 +329,41 @@ mod tests {
     }
 
     #[test]
+    fn transfer_event_payload_matches_state() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[23u8; 32]);
+        let owner = Address::generate(&e);
+        let recipient = Address::generate(&e);
+
+        client.set_owner(&namehash, &owner);
+        client.transfer(&namehash, &recipient);
+
+        let events = e.events().all();
+        assert_eq!(events.len(), 1);
+        let (contract_id, topics, data) = events.get(0).unwrap().clone();
+        assert_eq!(contract_id, id);
+        assert_eq!(
+            Symbol::try_from_val(&e, &topics.get(0).unwrap()).unwrap(),
+            Symbol::new(&e, "transfer")
+        );
+        let topic_namehash =
+            BytesN::<32>::try_from_val(&e, &topics.get(1).unwrap()).unwrap();
+        assert_eq!(topic_namehash, namehash);
+        let map = Map::<Symbol, Address>::try_from_val(&e, &data).unwrap();
+        assert_eq!(map.get(Symbol::new(&e, "from")).unwrap(), owner);
+        assert_eq!(map.get(Symbol::new(&e, "to")).unwrap(), recipient);
+
+        let stored_owner = e
+            .as_contract(&id, || Registry::read_owner(&e, &namehash))
+            .unwrap();
+        assert_eq!(stored_owner, recipient);
+    }
+
+    #[test]
     fn transfer_to_self_noop() {
         let e = Env::default();
         e.mock_all_auths();
@@ -532,8 +567,45 @@ mod tests {
             found = true;
             break;
         }
-       assert!(found, "expected resolver_changed event");
-   }
+        assert!(found, "expected resolver_changed event");
+    }
+
+    #[test]
+    fn resolver_event_payload_matches_state() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[24u8; 32]);
+        let owner = Address::generate(&e);
+        let resolver = Address::generate(&e);
+
+        client.set_owner(&namehash, &owner);
+        client.set_resolver(&namehash, &resolver);
+
+        let events = e.events().all();
+        assert_eq!(events.len(), 1);
+        let (contract_id, topics, data) = events.get(0).unwrap().clone();
+        assert_eq!(contract_id, id);
+        assert_eq!(
+            Symbol::try_from_val(&e, &topics.get(0).unwrap()).unwrap(),
+            Symbol::new(&e, "resolver_changed")
+        );
+        let topic_namehash =
+            BytesN::<32>::try_from_val(&e, &topics.get(1).unwrap()).unwrap();
+        assert_eq!(topic_namehash, namehash);
+        let map = Map::<Symbol, Address>::try_from_val(&e, &data).unwrap();
+        assert_eq!(
+            map.get(Symbol::new(&e, "resolver")).unwrap(),
+            resolver
+        );
+
+        let stored_resolver = e
+            .as_contract(&id, || Registry::read_resolver(&e, &namehash))
+            .unwrap();
+        assert_eq!(stored_resolver, resolver);
+    }
 
     #[test]
     fn resolver_idempotent_same_value() {
@@ -853,6 +925,42 @@ mod tests {
     #[test]
     #[ignore = "Renew event capture is inconsistent in the harness"]
     fn renew_emits_event_with_new_expiry() {}
+
+    #[test]
+    fn renew_event_timestamp_matches_state() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let id = e.register(Registry, ());
+        let client = RegistryClient::new(&e, &id);
+
+        let namehash = BytesN::from_array(&e, &[25u8; 32]);
+        let owner = Address::generate(&e);
+        let now = 42_000u64;
+
+        client.set_owner(&namehash, &owner);
+        e.ledger().set_timestamp(now);
+        client.renew(&namehash);
+
+        let events = e.events().all();
+        assert_eq!(events.len(), 1);
+        let (contract_id, topics, data) = events.get(0).unwrap().clone();
+        assert_eq!(contract_id, id);
+        assert_eq!(
+            Symbol::try_from_val(&e, &topics.get(0).unwrap()).unwrap(),
+            Symbol::new(&e, "renew")
+        );
+        let topic_namehash =
+            BytesN::<32>::try_from_val(&e, &topics.get(1).unwrap()).unwrap();
+        assert_eq!(topic_namehash, namehash);
+        let map = Map::<Symbol, u64>::try_from_val(&e, &data).unwrap();
+        let expires_at = map.get(Symbol::new(&e, "expires_at")).unwrap();
+
+        let stored_expiry = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
+        assert_eq!(stored_expiry, now + RENEW_EXTENSION_SECONDS);
+        assert_eq!(expires_at, stored_expiry);
+    }
 
     #[test]
     fn renew_requires_owner_auth() {

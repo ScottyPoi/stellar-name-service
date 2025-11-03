@@ -48,6 +48,7 @@ clean:
 # You can use `--network sandbox` (local) or `--network testnet`
 # Modify NETWORK variable below if you want a default.
 NETWORK := "sandbox"
+# SOURCE_ACCOUNT is optional; set `SOURCE_ACCOUNT=<pubkey>` when you need a specific deployer.
 SOURCE_ACCOUNT := env('SOURCE_ACCOUNT', '')
 
 # Build contract to Wasm (output to target/wasm32v1-none/release/)
@@ -73,12 +74,12 @@ invoke crate method filter='':
         exit 1; \
     fi; \
     if [ -n "{{filter}}" ]; then \
-        filter_arg="{{filter}}"; \
+        filter_args=({{filter}}); \
     else \
-        filter_arg="--filter-logs ${SOROBAN_FILTER_LOGS:-warn}"; \
+        filter_args=(--filter-logs "${SOROBAN_FILTER_LOGS:-warn}"); \
     fi; \
     soroban contract invoke \
-        ${filter_arg} \
+        "${filter_args[@]}" \
         --id ${CONTRACT_ID} \
         --network {{NETWORK}} \
         -- \

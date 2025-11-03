@@ -48,21 +48,39 @@ clean:
 # You can use `--network sandbox` (local) or `--network testnet`
 # Modify NETWORK variable below if you want a default.
 NETWORK := "sandbox"
+# SOURCE_ACCOUNT is optional; set `SOURCE_ACCOUNT=<pubkey>` when you need a specific deployer.
+SOURCE_ACCOUNT := env('SOURCE_ACCOUNT', '')
 
-# Build contract to Wasm (output to target/wasm32-unknown-unknown/release/)
+# Build contract to Wasm (output to target/wasm32v1-none/release/)
 build-contract crate:
-    soroban contract build contracts/{{crate}}
+    cd contracts/{{crate}} && soroban contract build
 
 # Deploy contract (returns contract ID)
 deploy crate:
+    if [ -n "{{SOURCE_ACCOUNT}}" ]; then \
+        source_arg="--source-account {{SOURCE_ACCOUNT}}"; \
+    else \
+        source_arg=""; \
+    fi; \
     soroban contract deploy \
-        --wasm target/wasm32-unknown-unknown/release/{{crate}}.wasm \
-        --network {{NETWORK}}
+        --wasm target/wasm32v1-none/release/{{crate}}.wasm \
+        --network {{NETWORK}} \
+        ${source_arg}
 
 # Invoke a method (example: just invoke registry version)
-invoke crate method:
+invoke crate method filter='':
+    if [ -z "${CONTRACT_ID:-}" ]; then \
+        echo "Set CONTRACT_ID to the deployed {{crate}} contract id before invoking."; \
+        exit 1; \
+    fi; \
+    if [ -n "{{filter}}" ]; then \
+        filter_args=({{filter}}); \
+    else \
+        filter_args=(--filter-logs "${SOROBAN_FILTER_LOGS:-warn}"); \
+    fi; \
     soroban contract invoke \
-        --id $(soroban contract id --wasm target/wasm32-unknown-unknown/release/{{crate}}.wasm --network {{NETWORK}}) \
+        "${filter_args[@]}" \
+        --id ${CONTRACT_ID} \
         --network {{NETWORK}} \
         -- \
         {{method}}

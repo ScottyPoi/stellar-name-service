@@ -48,7 +48,7 @@ clean:
 # You can use `--network sandbox` (local) or `--network testnet`
 # Modify NETWORK variable below if you want a default.
 NETWORK := "sandbox"
-SOURCE_ACCOUNT ?= ""
+SOURCE_ACCOUNT := env('SOURCE_ACCOUNT', '')
 
 # Build contract to Wasm (output to target/wasm32v1-none/release/)
 build-contract crate:

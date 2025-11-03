@@ -49,20 +49,31 @@ clean:
 # Modify NETWORK variable below if you want a default.
 NETWORK := "sandbox"
 
-# Build contract to Wasm (output to target/wasm32-unknown-unknown/release/)
+# Build contract to Wasm (output to target/wasm32v1-none/release/)
 build-contract crate:
-    soroban contract build contracts/{{crate}}
+    cd contracts/{{crate}} && soroban contract build
 
 # Deploy contract (returns contract ID)
 deploy crate:
     soroban contract deploy \
-        --wasm target/wasm32-unknown-unknown/release/{{crate}}.wasm \
-        --network {{NETWORK}}
+        --wasm target/wasm32v1-none/release/{{crate}}.wasm \
+        --network {{NETWORK}} \
+        --source-account {{SOURCE_ACCOUNT}}
 
 # Invoke a method (example: just invoke registry version)
-invoke crate method:
+invoke crate method filter='':
+    if [ -z "${CONTRACT_ID:-}" ]; then \
+        echo "Set CONTRACT_ID to the deployed {{crate}} contract id before invoking."; \
+        exit 1; \
+    fi; \
+    if [ -n "{{filter}}" ]; then \
+        filter_arg="{{filter}}"; \
+    else \
+        filter_arg="--filter-logs ${SOROBAN_FILTER_LOGS:-warn}"; \
+    fi; \
     soroban contract invoke \
-        --id $(soroban contract id --wasm target/wasm32-unknown-unknown/release/{{crate}}.wasm --network {{NETWORK}}) \
+        ${filter_arg} \
+        --id ${CONTRACT_ID} \
         --network {{NETWORK}} \
         -- \
         {{method}}

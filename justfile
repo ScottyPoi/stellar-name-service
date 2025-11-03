@@ -48,6 +48,7 @@ clean:
 # You can use `--network sandbox` (local) or `--network testnet`
 # Modify NETWORK variable below if you want a default.
 NETWORK := "sandbox"
+SOURCE_ACCOUNT ?= ""
 
 # Build contract to Wasm (output to target/wasm32v1-none/release/)
 build-contract crate:
@@ -55,10 +56,15 @@ build-contract crate:
 
 # Deploy contract (returns contract ID)
 deploy crate:
+    if [ -n "{{SOURCE_ACCOUNT}}" ]; then \
+        source_arg="--source-account {{SOURCE_ACCOUNT}}"; \
+    else \
+        source_arg=""; \
+    fi; \
     soroban contract deploy \
         --wasm target/wasm32v1-none/release/{{crate}}.wasm \
         --network {{NETWORK}} \
-        --source-account {{SOURCE_ACCOUNT}}
+        ${source_arg}
 
 # Invoke a method (example: just invoke registry version)
 invoke crate method filter='':

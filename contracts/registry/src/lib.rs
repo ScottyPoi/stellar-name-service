@@ -17,6 +17,9 @@ mod keys {
     pub const RESOLVER: &[u8] = b"REG_RESOLV";  // namehash -> Address
     pub const EXPIRES: &[u8] = b"REG_EXPIRE";   // namehash -> u64
     pub const FLAGS: &[u8] = b"REG_FLAGS";      // namehash -> u32 (bitflags)
+    // Global policy (instance storage)
+    pub const REGISTRAR: &[u8] = b"REG_POLICY_REGISTRAR";   // -> Address
+    pub const FIRST_CLAIM_ENABLED: &[u8] = b"REG_POLICY_FC"; // -> bool (default: true)
 }
 
 /// Event payload types (expand as needed).
@@ -61,7 +64,7 @@ enum DataKey {
 impl Registry {
     /// Trivial function so the contract exports at least one method.
     pub fn version(_env: Env) -> u32 {
-        1
+        2
     }
 
     fn is_zero_account(env: &Env, address: &Address) -> bool {
@@ -87,6 +90,31 @@ impl Registry {
             .get(&DataKey::Expires(namehash.clone()))
     }
 
+    fn get_registrar(env: &Env) -> Option<Address> {
+        let key = Bytes::from_slice(env, keys::REGISTRAR);
+        env.storage().instance().get::<_, Address>(&key)
+    }
+
+    fn set_registrar(env: &Env, a: &Address) {
+        let key = Bytes::from_slice(env, keys::REGISTRAR);
+        env.storage()
+            .instance()
+            .set::<_, Address>(&key, a);
+    }
+
+    fn get_first_claim_enabled(env: &Env) -> bool {
+        let key = Bytes::from_slice(env, keys::FIRST_CLAIM_ENABLED);
+        env.storage()
+            .instance()
+            .get::<_, bool>(&key)
+            .unwrap_or(true)
+    }
+
+    fn set_first_claim_enabled(env: &Env, v: bool) {
+        let key = Bytes::from_slice(env, keys::FIRST_CLAIM_ENABLED);
+        env.storage().instance().set::<_, bool>(&key, &v);
+    }
+
     // --- Stubs to be implemented later ---
     pub fn set_owner(env: Env, namehash: BytesN<32>, new_owner: Address) {
         if Self::is_zero_account(&env, &new_owner) {
@@ -98,22 +126,49 @@ impl Registry {
 
         match current_owner.as_ref() {
             Some(owner) => owner.require_auth(),
-            None => new_owner.require_auth(),
+            None => {
+                if Self::get_first_claim_enabled(&env) {
+                    new_owner.require_auth();
+                } else {
+                    let registrar =
+                        Self::get_registrar(&env).expect("registrar not set");
+                    registrar.require_auth();
+                }
+            }
         }
 
         env.storage().persistent().set(&key, &new_owner);
 
-        let from = current_owner.unwrap_or_else(|| new_owner.clone());
+        let is_first_claim = current_owner.is_none();
+        let from = current_owner
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| new_owner.clone());
         EvtTransfer {
-            namehash,
+            namehash: namehash.clone(),
             from,
             to: new_owner,
         }
         .publish(&env);
+
+        if is_first_claim {
+            let now = env.ledger().timestamp();
+            let new_expiry = now
+                .checked_add(RENEW_EXTENSION_SECONDS)
+                .unwrap_or_else(|| panic!("expiry overflow"));
+            env.storage()
+                .persistent()
+                .set(&DataKey::Expires(namehash.clone()), &new_expiry);
+            EvtRenew {
+                namehash,
+                expires_at: new_expiry,
+            }
+            .publish(&env);
+        }
     }
 
-    pub fn owner(env: Env, namehash: BytesN<32>) -> Address {
-        Self::read_owner(&env, &namehash).unwrap_or_else(|| panic!("owner not set"))
+    pub fn owner(env: Env, namehash: BytesN<32>) -> Option<Address> {
+        Self::read_owner(&env, &namehash)
     }
 
     pub fn transfer(env: Env, namehash: BytesN<32>, to: Address) {
@@ -136,8 +191,8 @@ impl Registry {
         EvtResolverChanged { namehash, resolver }.publish(&env);
     }
 
-    pub fn resolver(env: Env, namehash: BytesN<32>) -> Address {
-        Self::read_resolver(&env, &namehash).unwrap_or_else(|| panic!("resolver not set"))
+    pub fn resolver(env: Env, namehash: BytesN<32>) -> Option<Address> {
+        Self::read_resolver(&env, &namehash)
     }
 
     pub fn renew(env: Env, namehash: BytesN<32>) {
@@ -169,7 +224,25 @@ impl Registry {
     }
 
     pub fn expires(env: Env, namehash: BytesN<32>) -> u64 {
-        Self::read_expires(&env, &namehash).unwrap_or_else(|| panic!("expiry not set"))
+        Self::read_expires(&env, &namehash).unwrap_or(0)
+    }
+
+    /// Admin: set registrar and toggle first-claim mode.
+    /// Bootstrap rule: if registrar not set, the proposed registrar must authorize;
+    /// afterwards only the current registrar may update.
+    pub fn set_policy(env: Env, registrar: Address, first_claim_enabled: bool) {
+        match Self::get_registrar(&env) {
+            None => {
+                registrar.require_auth();
+                Self::set_registrar(&env, &registrar);
+                Self::set_first_claim_enabled(&env, first_claim_enabled);
+            }
+            Some(cur) => {
+                cur.require_auth();
+                Self::set_registrar(&env, &registrar);
+                Self::set_first_claim_enabled(&env, first_claim_enabled);
+            }
+        }
     }
 
     pub fn namehash(env: Env, labels: Vec<Bytes>) -> BytesN<32> {
@@ -205,7 +278,7 @@ mod tests {
         e.mock_all_auths();
         let id = e.register(Registry, ());
         let client = RegistryClient::new(&e, &id);
-        assert_eq!(client.version(), 1);
+        assert_eq!(client.version(), 2);
     }
 
     #[test]
@@ -229,7 +302,7 @@ mod tests {
             }])
             .set_owner(&namehash, &owner);
 
-        assert_eq!(client.owner(&namehash), owner);
+        assert_eq!(client.owner(&namehash).unwrap(), owner);
     }
 
     #[test]
@@ -376,7 +449,7 @@ mod tests {
         client.set_owner(&namehash, &owner);
         client.transfer(&namehash, &owner);
 
-        assert_eq!(client.owner(&namehash), owner);
+        assert_eq!(client.owner(&namehash).unwrap(), owner);
     }
 
     #[test]
@@ -411,8 +484,8 @@ mod tests {
 
         client.transfer(&namehash_a, &new_owner_a);
 
-        assert_eq!(client.owner(&namehash_a), new_owner_a);
-        assert_eq!(client.owner(&namehash_b), owner_b);
+        assert_eq!(client.owner(&namehash_a).unwrap(), new_owner_a);
+        assert_eq!(client.owner(&namehash_b).unwrap(), owner_b);
     }
 
     #[test]
@@ -452,7 +525,7 @@ mod tests {
         }));
 
         assert!(attempted_takeover.is_err());
-        assert_eq!(client.owner(&namehash), owner);
+        assert_eq!(client.owner(&namehash).unwrap(), owner);
     }
 
     #[test]
@@ -469,7 +542,7 @@ mod tests {
         client.set_owner(&namehash, &owner);
         client.transfer(&namehash, &recipient);
 
-        assert_eq!(client.owner(&namehash), recipient);
+        assert_eq!(client.owner(&namehash).unwrap(), recipient);
     }
 
     #[test]
@@ -506,7 +579,7 @@ mod tests {
             }])
             .set_resolver(&namehash, &resolver);
 
-        assert_eq!(client.resolver(&namehash), resolver);
+        assert_eq!(client.resolver(&namehash).unwrap(), resolver);
     }
 
     #[test]
@@ -653,7 +726,7 @@ mod tests {
             }])
             .set_resolver(&namehash, &resolver);
 
-        assert_eq!(client.resolver(&namehash), resolver);
+        assert_eq!(client.resolver(&namehash).unwrap(), resolver);
     }
 
     #[test]
@@ -732,8 +805,8 @@ mod tests {
             }])
             .set_resolver(&namehash_a, &resolver_a2);
 
-        assert_eq!(client.resolver(&namehash_a), resolver_a2);
-        assert_eq!(client.resolver(&namehash_b), resolver_b);
+        assert_eq!(client.resolver(&namehash_a).unwrap(), resolver_a2);
+        assert_eq!(client.resolver(&namehash_b).unwrap(), resolver_b);
     }
 
     #[test]
@@ -860,25 +933,23 @@ mod tests {
     }
 
     #[test]
-    fn owner_default_panics() {
+    fn owner_default_returns_none() {
         let e = Env::default();
         let id = e.register(Registry, ());
         let client = RegistryClient::new(&e, &id);
         let namehash = BytesN::from_array(&e, &[9u8; 32]);
 
-        let result = catch_unwind(AssertUnwindSafe(|| client.owner(&namehash)));
-        assert!(result.is_err());
+        assert!(client.owner(&namehash).is_none());
     }
 
     #[test]
-    fn resolver_default_panics() {
+    fn resolver_default_returns_none() {
         let e = Env::default();
         let id = e.register(Registry, ());
         let client = RegistryClient::new(&e, &id);
         let namehash = BytesN::from_array(&e, &[20u8; 32]);
 
-        let result = catch_unwind(AssertUnwindSafe(|| client.resolver(&namehash)));
-        assert!(result.is_err());
+        assert!(client.resolver(&namehash).is_none());
     }
 
     #[test]
@@ -919,7 +990,7 @@ mod tests {
         let expiry = e
             .as_contract(&id, || Registry::read_expires(&e, &namehash))
             .unwrap();
-        assert_eq!(expiry, now + RENEW_EXTENSION_SECONDS);
+        assert_eq!(expiry, now + RENEW_EXTENSION_SECONDS * 2);
     }
 
     #[test]
@@ -930,10 +1001,13 @@ mod tests {
         let client = RegistryClient::new(&e, &id);
 
         let namehash = BytesN::from_array(&e, &[25u8; 32]);
-        let owner = Address::generate(&e);
-        let now = 42_000u64;
+       let owner = Address::generate(&e);
+       let now = 42_000u64;
 
-        client.set_owner(&namehash, &owner);
+       client.set_owner(&namehash, &owner);
+        let initial_expiry = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
         e.ledger().set_timestamp(now);
         client.renew(&namehash);
 
@@ -954,8 +1028,9 @@ mod tests {
         let stored_expiry = e
             .as_contract(&id, || Registry::read_expires(&e, &namehash))
             .unwrap();
-        assert_eq!(stored_expiry, now + RENEW_EXTENSION_SECONDS);
-        assert_eq!(expires_at, stored_expiry);
+        let expected_expiry = initial_expiry + RENEW_EXTENSION_SECONDS;
+        assert_eq!(stored_expiry, expected_expiry);
+        assert_eq!(expires_at, expected_expiry);
     }
 
     #[test]
@@ -982,6 +1057,10 @@ mod tests {
             }])
             .set_owner(&namehash, &owner);
 
+        let seeded_expiry = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
+
         let attempt = catch_unwind(AssertUnwindSafe(|| {
             client
                 .mock_auths(&[MockAuth {
@@ -998,7 +1077,7 @@ mod tests {
 
         assert!(attempt.is_err());
         let expiry = e.as_contract(&id, || Registry::read_expires(&e, &namehash));
-        assert!(expiry.is_none());
+        assert_eq!(expiry, Some(seeded_expiry));
     }
 
     #[test]
@@ -1208,17 +1287,21 @@ mod tests {
             }])
             .set_owner(&namehash, &owner);
 
+        let seeded_expiry = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
+
         let set_owner_attempt = catch_unwind(AssertUnwindSafe(|| {
             client.set_owner(&namehash, &attacker);
         }));
         assert!(set_owner_attempt.is_err());
-        assert_eq!(client.owner(&namehash), owner);
+        assert_eq!(client.owner(&namehash).unwrap(), owner);
 
         let transfer_attempt = catch_unwind(AssertUnwindSafe(|| {
             client.transfer(&namehash, &attacker);
         }));
         assert!(transfer_attempt.is_err());
-        assert_eq!(client.owner(&namehash), owner);
+        assert_eq!(client.owner(&namehash).unwrap(), owner);
 
         let resolver_attempt = catch_unwind(AssertUnwindSafe(|| {
             client.set_resolver(&namehash, &resolver);
@@ -1234,7 +1317,7 @@ mod tests {
         assert!(renew_attempt.is_err());
         let expires_state =
             e.as_contract(&id, || Registry::read_expires(&e, &namehash));
-        assert!(expires_state.is_none());
+        assert_eq!(expires_state, Some(seeded_expiry));
     }
 
     #[test]
@@ -1263,12 +1346,13 @@ mod tests {
 
         client.renew(&namehash);
 
-        assert_eq!(client.owner(&namehash), new_owner);
-        assert_eq!(client.resolver(&namehash), resolver2);
+        assert_eq!(client.owner(&namehash).unwrap(), new_owner);
+        assert_eq!(client.resolver(&namehash).unwrap(), resolver2);
         let expiry = e
             .as_contract(&id, || Registry::read_expires(&e, &namehash))
             .unwrap();
-        assert_eq!(expiry, second_now + RENEW_EXTENSION_SECONDS);
+        let expected_expiry = first_now + RENEW_EXTENSION_SECONDS * 2;
+        assert_eq!(expiry, expected_expiry);
     }
 
     #[test]
@@ -1285,7 +1369,7 @@ mod tests {
 
         client.set_owner(&namehash, &owner);
         let events = e.events().all();
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.len(), 2);
         let (contract_id, topics, data) = events.get(0).unwrap().clone();
         assert_eq!(contract_id, id);
         assert_eq!(
@@ -1295,6 +1379,23 @@ mod tests {
         let map = Map::<Symbol, Address>::try_from_val(&e, &data).unwrap();
         assert_eq!(map.get(Symbol::new(&e, "from")).unwrap(), owner);
         assert_eq!(map.get(Symbol::new(&e, "to")).unwrap(), owner);
+
+        let (contract_id, topics, data) = events.get(1).unwrap().clone();
+        assert_eq!(contract_id, id);
+        assert_eq!(
+            Symbol::try_from_val(&e, &topics.get(0).unwrap()).unwrap(),
+            Symbol::new(&e, "renew")
+        );
+        let topic_namehash =
+            BytesN::<32>::try_from_val(&e, &topics.get(1).unwrap()).unwrap();
+        assert_eq!(topic_namehash, namehash);
+        let renew_map = Map::<Symbol, u64>::try_from_val(&e, &data).unwrap();
+        let renew_expires =
+            renew_map.get(Symbol::new(&e, "expires_at")).unwrap();
+        let stored_after_claim = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
+        assert_eq!(renew_expires, stored_after_claim);
 
         client.transfer(&namehash, &new_owner);
         let events = e.events().all();
@@ -1425,6 +1526,9 @@ mod tests {
         );
 
         client.set_owner(&namehash, &owner);
+        let seeded_expiry = e
+            .as_contract(&id, || Registry::read_expires(&e, &namehash))
+            .unwrap();
         assert_eq!(
             e.as_contract(&id, || Registry::read_owner(&e, &namehash)),
             Some(owner.clone())
@@ -1433,9 +1537,10 @@ mod tests {
             e.as_contract(&id, || Registry::read_resolver(&e, &namehash)).is_none(),
             "resolver slot should remain untouched after set_owner"
         );
-        assert!(
-            e.as_contract(&id, || Registry::read_expires(&e, &namehash)).is_none(),
-            "expiry slot should remain untouched after set_owner"
+        assert_eq!(
+            e.as_contract(&id, || Registry::read_expires(&e, &namehash)),
+            Some(seeded_expiry),
+            "expiry slot should be initialized on first claim"
         );
 
         client.set_resolver(&namehash, &resolver);
@@ -1448,15 +1553,16 @@ mod tests {
             Some(owner.clone()),
             "owner slot should remain intact after set_resolver"
         );
-        assert!(
-            e.as_contract(&id, || Registry::read_expires(&e, &namehash)).is_none(),
+        assert_eq!(
+            e.as_contract(&id, || Registry::read_expires(&e, &namehash)),
+            Some(seeded_expiry),
             "expiry slot should remain untouched after set_resolver"
         );
 
         let now = 555u64;
         e.ledger().set_timestamp(now);
         client.renew(&namehash);
-        let expected_expiry = now + RENEW_EXTENSION_SECONDS;
+        let expected_expiry = seeded_expiry + RENEW_EXTENSION_SECONDS;
         assert_eq!(
             e.as_contract(&id, || Registry::read_expires(&e, &namehash)),
             Some(expected_expiry),
@@ -1501,22 +1607,8 @@ mod tests {
             e.as_contract(&id, || Registry::read_expires(&e, &unknown)).is_none()
         );
 
-        let owner_call =
-            catch_unwind(AssertUnwindSafe(|| client.owner(&unknown)));
-        assert!(owner_call.is_err(), "owner() should panic for unknown namehash");
-
-        let resolver_call =
-            catch_unwind(AssertUnwindSafe(|| client.resolver(&unknown)));
-        assert!(
-            resolver_call.is_err(),
-            "resolver() should panic for unknown namehash"
-        );
-
-        let expires_call =
-            catch_unwind(AssertUnwindSafe(|| client.expires(&unknown)));
-        assert!(
-            expires_call.is_err(),
-            "expires() should panic for unknown namehash"
-        );
+        assert!(client.owner(&unknown).is_none());
+        assert!(client.resolver(&unknown).is_none());
+        assert_eq!(client.expires(&unknown), 0);
     }
 }

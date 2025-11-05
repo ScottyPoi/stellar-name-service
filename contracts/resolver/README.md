@@ -107,4 +107,4 @@ Tests rely on `soroban-sdk`’s `testutils` feature being enabled in `Cargo.toml
 - Text keys must respect the non-empty and 256-byte limits; this is asserted in tests.
 - Prefer `contractevent`-based publishing for new events to stay aligned with SDK best practices.
 
-By following these guidelines, automated changes will remain compatible with both the Soroban host and downstream tooling.***
+By following these guidelines, automated changes will remain compatible with both the Soroban host and downstream tooling.

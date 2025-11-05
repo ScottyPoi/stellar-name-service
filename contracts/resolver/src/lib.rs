@@ -141,6 +141,10 @@ impl Resolver {
 
         EvtTextChanged { namehash, key }.publish(&env);
     }
+
+    pub fn registry(env: Env) -> Address {
+        ensure_initialized(&env)
+    }
 }
 
 #[cfg(test)]

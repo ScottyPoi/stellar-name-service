@@ -48,13 +48,14 @@ impl Resolver {
         1
     }
 
-    // --- Stubs to be implemented later ---
-    // pub fn init(env: Env, registry: Address) { ... }
-    // pub fn addr(env: Env, namehash: BytesN<32>) -> Address { ... }
-    // pub fn set_addr(env: Env, namehash: BytesN<32>, addr: Address) { ... }
-    // pub fn text(env: Env, namehash: BytesN<32>, key: Bytes) -> Option<Bytes> { ... }
-    // pub fn set_text(env: Env, namehash: BytesN<32>, key: Bytes, value: Bytes) { ... }
-    // Helper: verify ownership by querying Registry
+    pub fn init(env: Env, registry: Address) {
+        let storage = env.storage().persistent();
+        let key = registry_storage_key(&env);
+        if storage.has(&key) {
+            panic_with_error!(&env, ResolverError::AlreadyInitialized);
+        }
+        storage.set(&key, &registry);
+    }
 }
 
 #[cfg(test)]

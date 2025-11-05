@@ -24,6 +24,9 @@ pub struct EvtTextChanged {
     pub namehash: BytesN<32>,
     pub key: Bytes,
 }
+fn registry_storage_key(env: &Env) -> Bytes {
+    Bytes::from_slice(env, keys::REGISTRY)
+}
 
 #[contract]
 pub struct Resolver;

@@ -13,7 +13,6 @@
     "migrate": "tsx src/db.ts --migrate"
   },
   "dependencies": {
-    "-": "^0.0.1",
     "@fastify/etag": "^6.1.0",
     "@stellar/stellar-sdk": "^14.3.0",
     "dotenv": "^17.2.3",

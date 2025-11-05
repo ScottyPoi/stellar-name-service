@@ -79,7 +79,7 @@ fn require_owner(env: &Env, caller: &Address, namehash: &BytesN<32>) {
     let owner: Address = env.invoke_contract(
         &registry,
         &Symbol::new(env, "owner"),
-        (&namehash.clone(),).into_val(env),
+        (namehash,).into_val(env),
     );
     if owner != *caller {
         panic_with_error!(env, ResolverError::NotOwner);

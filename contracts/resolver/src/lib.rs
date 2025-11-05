@@ -63,6 +63,15 @@ fn validate_text_key(env: &Env, key: &Bytes) {
     }
 }
 
+fn ensure_initialized(env: &Env) -> Address {
+    let storage = env.storage().persistent();
+    let key = registry_storage_key(env);
+    storage
+        .get(&key)
+        .unwrap_or_else(|| panic_with_error!(env, ResolverError::NotInitialized))
+}
+
+
 #[contract]
 pub struct Resolver;
 

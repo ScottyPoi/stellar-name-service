@@ -61,7 +61,7 @@ fn text_storage_key(env: &Env, namehash: &BytesN<32>, text_key: &Bytes) -> Bytes
 }
 
 fn validate_text_key(env: &Env, key: &Bytes) {
-    if key.len() == 0 || key.len() > MAX_TEXT_KEY_LEN {
+    if key.is_empty() || key.len() > MAX_TEXT_KEY_LEN {
         panic_with_error!(env, ResolverError::InvalidInput);
     }
 }

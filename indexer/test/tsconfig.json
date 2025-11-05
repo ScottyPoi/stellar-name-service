@@ -9,7 +9,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "noImplicitOverride": true,
+    "noImplicitOverride": true
   },
   "include": [
     "./",

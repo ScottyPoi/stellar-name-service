@@ -214,4 +214,21 @@ mod tests {
         assert!(second_call.is_err());
         assert_eq!(resolver.registry(), registry_id);
     }
+
+    #[test]
+    fn unset_reads_return_none() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let resolver_id = e.register(Resolver, ());
+        let registry_id = e.register(MockRegistry, ());
+        let resolver = ResolverClient::new(&e, &resolver_id);
+
+        resolver.init(&registry_id);
+
+        let namehash = namehash(&e, 1);
+        let key = bytes(&e, b"profile");
+
+        assert!(resolver.addr(&namehash).is_none());
+        assert!(resolver.text(&namehash, &key).is_none());
+    }
 }

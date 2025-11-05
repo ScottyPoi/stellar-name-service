@@ -10,9 +10,9 @@ use soroban_sdk::{
 
 /// Storage keys (placeholders)
 mod keys {
-    pub const ADDR: &[u8] = b"RES_ADDR";      // namehash -> Address
-    pub const TEXT: &[u8] = b"RES_TEXT_";     // namespace prefix: TEXT || key || namehash -> String
-    pub const REGISTRY: &[u8] = b"RES_REG";   // singleton: Address (Registry contract)
+    pub const ADDR: &[u8] = b"RES_ADDR"; // namehash -> Address
+    pub const TEXT: &[u8] = b"RES_TEXT_"; // namespace prefix: TEXT || key || namehash -> String
+    pub const REGISTRY: &[u8] = b"RES_REG"; // singleton: Address (Registry contract)
 }
 
 /// Events (placeholders)
@@ -231,6 +231,7 @@ mod tests {
         assert!(resolver.addr(&namehash).is_none());
         assert!(resolver.text(&namehash, &key).is_none());
     }
+
     #[test]
     fn set_addr_happy_path() {
         let e = Env::default();

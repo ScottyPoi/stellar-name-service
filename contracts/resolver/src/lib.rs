@@ -410,4 +410,35 @@ mod tests {
         assert!(resolver.text(&name_b, &key_primary).is_none());
     }
 
+    #[test]
+    fn ownership_changes_require_new_auth() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let resolver_id = e.register(Resolver, ());
+        let registry_id = e.register(MockRegistry, ());
+        let resolver = ResolverClient::new(&e, &resolver_id);
+        let registry = MockRegistryClient::new(&e, &registry_id);
+
+        resolver.init(&registry_id);
+
+        let namehash = namehash(&e, 8);
+        let owner_initial = Address::generate(&e);
+        let owner_new = Address::generate(&e);
+        let first_addr = Address::generate(&e);
+        let second_addr = Address::generate(&e);
+
+        registry.set_owner(&namehash, &owner_initial);
+        resolver.set_addr(&owner_initial, &namehash, &first_addr);
+        assert_eq!(resolver.addr(&namehash), Some(first_addr));
+
+        registry.set_owner(&namehash, &owner_new);
+
+        let stale_owner_attempt = catch_unwind(AssertUnwindSafe(|| {
+            resolver.set_addr(&owner_initial, &namehash, &second_addr)
+        }));
+        assert!(stale_owner_attempt.is_err());
+
+        resolver.set_addr(&owner_new, &namehash, &second_addr);
+        assert_eq!(resolver.addr(&namehash), Some(second_addr));
+    }
 }

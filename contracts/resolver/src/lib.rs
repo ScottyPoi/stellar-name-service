@@ -194,8 +194,8 @@ mod tests {
     #[test]
     fn it_compiles_and_returns_version() {
         let e = Env::default();
-        let id = e.register(Resolver, ());
-        let client = ResolverClient::new(&e, &id);
+        let resolver_id = e.register(Resolver, ());
+        let client = ResolverClient::new(&e, &resolver_id);
         assert_eq!(client.version(), 1);
     }
 }

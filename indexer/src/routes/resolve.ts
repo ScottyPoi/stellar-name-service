@@ -5,7 +5,6 @@ import {
   normalizeFqdn,
   validateFqdn
 } from "../utils/name.js";
-import { logger } from "../utils/logger.js";
 
 const ADDR_KEY_HEX = Buffer.from("addr", "utf8").toString("hex");
 

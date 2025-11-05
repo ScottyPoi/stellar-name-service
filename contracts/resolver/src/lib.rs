@@ -24,8 +24,9 @@ pub struct EvtAddressChanged {
 }
 
 #[derive(Clone)]
-#[contracttype]
+#[contractevent(topics = ["text_changed"])]
 pub struct EvtTextChanged {
+    #[topic]
     pub namehash: BytesN<32>,
     pub key: Bytes,
 }

@@ -90,6 +90,14 @@ impl Resolver {
         }
         storage.set(&key, &registry);
     }
+
+    pub fn addr(env: Env, namehash: BytesN<32>) -> Option<Address> {
+        ensure_initialized(&env);
+        let storage = env.storage().persistent();
+        let key = addr_storage_key(&env, &namehash);
+        storage.get(&key)
+    }
+
 }
 
 #[cfg(test)]

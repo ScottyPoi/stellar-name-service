@@ -338,4 +338,38 @@ mod tests {
         assert_eq!(recorded_key, key);
     }
 
+    #[test]
+    fn set_text_invalid_key_rejected() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let resolver_id = e.register(Resolver, ());
+        let registry_id = e.register(MockRegistry, ());
+        let resolver = ResolverClient::new(&e, &resolver_id);
+        let registry = MockRegistryClient::new(&e, &registry_id);
+
+        resolver.init(&registry_id);
+
+        let namehash = namehash(&e, 5);
+        let owner = Address::generate(&e);
+        registry.set_owner(&namehash, &owner);
+
+        let empty_key = bytes(&e, &[]);
+        let value = bytes(&e, b"data");
+        let long_vec = {
+            let mut buffer = std::vec::Vec::new();
+            buffer.resize((MAX_TEXT_KEY_LEN + 1) as usize, 7u8);
+            buffer
+        };
+        let too_long_key = Bytes::from_slice(&e, &long_vec);
+
+        let empty_attempt = catch_unwind(AssertUnwindSafe(|| {
+            resolver.set_text(&owner, &namehash, &empty_key, &value)
+        }));
+        assert!(empty_attempt.is_err());
+
+        let long_attempt = catch_unwind(AssertUnwindSafe(|| {
+            resolver.set_text(&owner, &namehash, &too_long_key, &value)
+        }));
+        assert!(long_attempt.is_err());
+    }
 }

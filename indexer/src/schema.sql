@@ -13,9 +13,6 @@ CREATE TABLE IF NOT EXISTS records (
   PRIMARY KEY (namehash, key)
 );
 
-CREATE INDEX IF NOT EXISTS records_namehash_key_idx
-  ON records (namehash, key);
-
 CREATE TABLE IF NOT EXISTS events (
   tx_id TEXT NOT NULL,
   ev_index INT NOT NULL,

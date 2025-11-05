@@ -24,6 +24,16 @@ pub struct EvtTextChanged {
     pub namehash: BytesN<32>,
     pub key: Bytes,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[contracterror]
+#[repr(u32)]
+pub enum ResolverError {
+    NotInitialized = 1,
+    AlreadyInitialized = 2,
+    NotOwner = 3,
+    InvalidInput = 4,
+}
 fn registry_storage_key(env: &Env) -> Bytes {
     Bytes::from_slice(env, keys::REGISTRY)
 }

@@ -231,4 +231,43 @@ mod tests {
         assert!(resolver.addr(&namehash).is_none());
         assert!(resolver.text(&namehash, &key).is_none());
     }
+    #[test]
+    fn set_addr_happy_path() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let resolver_id = e.register(Resolver, ());
+        let registry_id = e.register(MockRegistry, ());
+        let resolver = ResolverClient::new(&e, &resolver_id);
+        let registry = MockRegistryClient::new(&e, &registry_id);
+
+        let namehash = namehash(&e, 2);
+        let owner = Address::generate(&e);
+        let addr = Address::generate(&e);
+        registry.set_owner(&namehash, &owner);
+
+        resolver.init(&registry_id);
+        resolver.set_addr(&owner, &namehash, &addr);
+
+        let events = e.events().all();
+        assert_eq!(resolver.addr(&namehash), Some(addr.clone()));
+        assert_eq!(events.len(), 1, "expected address event");
+        let (event_contract, topics, data) = events.get(0).unwrap();
+        assert_eq!(event_contract, resolver_id);
+
+        let topic_symbol =
+            Symbol::try_from_val(&e, &topics.get(0).expect("topic symbol missing")).unwrap();
+        assert_eq!(topic_symbol, Symbol::new(&e, "address_changed"));
+
+        let topic_namehash =
+            BytesN::<32>::try_from_val(&e, &topics.get(1).expect("topic namehash missing"))
+                .unwrap();
+        assert_eq!(topic_namehash, namehash);
+
+        let data_map =
+            Map::<Symbol, Address>::try_from_val(&e, &data).expect("unable to decode event data");
+        let recorded_addr = data_map
+            .get(Symbol::new(&e, "addr"))
+            .expect("addr missing in event");
+        assert_eq!(recorded_addr, addr);
+    }
 }

@@ -198,4 +198,20 @@ mod tests {
         let client = ResolverClient::new(&e, &resolver_id);
         assert_eq!(client.version(), 1);
     }
+
+    #[test]
+    fn init_once() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let resolver_id = e.register(Resolver, ());
+        let registry_id = e.register(MockRegistry, ());
+        let resolver = ResolverClient::new(&e, &resolver_id);
+
+        resolver.init(&registry_id);
+        assert_eq!(resolver.registry(), registry_id.clone());
+
+        let second_call = catch_unwind(AssertUnwindSafe(|| resolver.init(&registry_id)));
+        assert!(second_call.is_err());
+        assert_eq!(resolver.registry(), registry_id);
+    }
 }

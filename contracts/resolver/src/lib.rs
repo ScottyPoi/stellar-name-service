@@ -16,8 +16,9 @@ mod keys {
 
 /// Events (placeholders)
 #[derive(Clone)]
-#[contracttype]
+#[contractevent(topics = ["address_changed"])]
 pub struct EvtAddressChanged {
+    #[topic]
     pub namehash: BytesN<32>,
     pub addr: Address,
 }
@@ -71,6 +72,17 @@ fn ensure_initialized(env: &Env) -> Address {
         .unwrap_or_else(|| panic_with_error!(env, ResolverError::NotInitialized))
 }
 
+fn require_owner(env: &Env, caller: &Address, namehash: &BytesN<32>) {
+    let registry = ensure_initialized(env);
+    let owner: Address = env.invoke_contract(
+        &registry,
+        &Symbol::new(env, "owner"),
+        (&namehash.clone(),).into_val(env),
+    );
+    if owner != *caller {
+        panic_with_error!(env, ResolverError::NotOwner);
+    }
+}
 
 #[contract]
 pub struct Resolver;

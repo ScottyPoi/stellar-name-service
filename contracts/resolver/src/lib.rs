@@ -118,6 +118,17 @@ impl Resolver {
         storage.get(&data_key)
     }
 
+    pub fn set_addr(env: Env, caller: Address, namehash: BytesN<32>, addr: Address) {
+        caller.require_auth();
+        require_owner(&env, &caller, &namehash);
+
+        let storage = env.storage().persistent();
+        let key = addr_storage_key(&env, &namehash);
+        storage.set(&key, &addr);
+
+        EvtAddressChanged { namehash, addr }.publish(&env);
+    }
+
 }
 
 #[cfg(test)]

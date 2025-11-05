@@ -2,6 +2,10 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Bytes, BytesN, Env};
 
+use soroban_sdk::{
+    contract, contracterror, contractevent, contractimpl, panic_with_error, Address, Bytes, BytesN,
+    Env, IntoVal, Symbol,
+};
 
 /// Storage keys (placeholders)
 mod keys {
@@ -34,6 +38,8 @@ pub enum ResolverError {
     NotOwner = 3,
     InvalidInput = 4,
 }
+
+const MAX_TEXT_KEY_LEN: u32 = 256;
 fn registry_storage_key(env: &Env) -> Bytes {
     Bytes::from_slice(env, keys::REGISTRY)
 }
@@ -42,6 +48,19 @@ fn addr_storage_key(env: &Env, namehash: &BytesN<32>) -> Bytes {
     let mut key = Bytes::from_slice(env, keys::ADDR);
     key.extend_from_array(&namehash.to_array());
     key
+}
+
+fn text_storage_key(env: &Env, namehash: &BytesN<32>, text_key: &Bytes) -> Bytes {
+    let mut key = Bytes::from_slice(env, keys::TEXT);
+    key.extend_from_array(&namehash.to_array());
+    key.append(text_key);
+    key
+}
+
+fn validate_text_key(env: &Env, key: &Bytes) {
+    if key.len() == 0 || key.len() > MAX_TEXT_KEY_LEN {
+        panic_with_error!(env, ResolverError::InvalidInput);
+    }
 }
 
 #[contract]

@@ -130,6 +130,17 @@ impl Resolver {
         EvtAddressChanged { namehash, addr }.publish(&env);
     }
 
+    pub fn set_text(env: Env, caller: Address, namehash: BytesN<32>, key: Bytes, value: Bytes) {
+        caller.require_auth();
+        validate_text_key(&env, &key);
+        require_owner(&env, &caller, &namehash);
+
+        let storage = env.storage().persistent();
+        let data_key = text_storage_key(&env, &namehash, &key);
+        storage.set(&data_key, &value);
+
+        EvtTextChanged { namehash, key }.publish(&env);
+    }
 }
 
 #[cfg(test)]

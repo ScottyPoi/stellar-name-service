@@ -372,4 +372,42 @@ mod tests {
         }));
         assert!(long_attempt.is_err());
     }
+
+    #[test]
+    fn records_are_isolated() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let resolver_id = e.register(Resolver, ());
+        let registry_id = e.register(MockRegistry, ());
+        let resolver = ResolverClient::new(&e, &resolver_id);
+        let registry = MockRegistryClient::new(&e, &registry_id);
+
+        resolver.init(&registry_id);
+
+        let name_a = namehash(&e, 6);
+        let name_b = namehash(&e, 7);
+        let owner_a = Address::generate(&e);
+        let owner_b = Address::generate(&e);
+        registry.set_owner(&name_a, &owner_a);
+        registry.set_owner(&name_b, &owner_b);
+
+        let addr_a = Address::generate(&e);
+        resolver.set_addr(&owner_a, &name_a, &addr_a);
+
+        assert_eq!(resolver.addr(&name_a), Some(addr_a.clone()));
+        assert!(resolver.addr(&name_b).is_none());
+
+        let key_primary = bytes(&e, b"profile");
+        let key_secondary = bytes(&e, b"avatar");
+        let val_primary = bytes(&e, b"primary");
+        let val_secondary = bytes(&e, b"secondary");
+
+        resolver.set_text(&owner_a, &name_a, &key_primary, &val_primary);
+        resolver.set_text(&owner_a, &name_a, &key_secondary, &val_secondary);
+
+        assert_eq!(resolver.text(&name_a, &key_primary), Some(val_primary));
+        assert_eq!(resolver.text(&name_a, &key_secondary), Some(val_secondary));
+        assert!(resolver.text(&name_b, &key_primary).is_none());
+    }
+
 }

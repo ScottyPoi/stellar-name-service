@@ -8,14 +8,14 @@ use soroban_sdk::{
     Env, IntoVal, Symbol,
 };
 
-/// Storage keys (placeholders)
+/// Storage keys
 mod keys {
     pub const ADDR: &[u8] = b"RES_ADDR"; // namehash -> Address
     pub const TEXT: &[u8] = b"RES_TEXT_"; // namespace prefix: TEXT || key || namehash -> String
     pub const REGISTRY: &[u8] = b"RES_REG"; // singleton: Address (Registry contract)
 }
 
-/// Events (placeholders)
+/// Events
 #[derive(Clone)]
 #[contractevent(topics = ["address_changed"])]
 pub struct EvtAddressChanged {
@@ -91,7 +91,7 @@ pub struct Resolver;
 
 #[contractimpl]
 impl Resolver {
-    /// Trivial export — replace with real constructor that sets Registry address.
+
     pub fn version(_env: Env) -> u32 {
         1
     }

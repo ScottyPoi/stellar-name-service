@@ -295,4 +295,47 @@ mod tests {
         assert!(attempt.is_err());
         assert!(resolver.addr(&namehash).is_none());
     }
+
+    #[test]
+    fn set_text_happy_path() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let resolver_id = e.register(Resolver, ());
+        let registry_id = e.register(MockRegistry, ());
+        let resolver = ResolverClient::new(&e, &resolver_id);
+        let registry = MockRegistryClient::new(&e, &registry_id);
+
+        let namehash = namehash(&e, 4);
+        let owner = Address::generate(&e);
+        registry.set_owner(&namehash, &owner);
+
+        let key = bytes(&e, b"profile");
+        let value = bytes(&e, b"ipfs://hash");
+
+        resolver.init(&registry_id);
+        resolver.set_text(&owner, &namehash, &key, &value);
+
+        let events = e.events().all();
+        assert_eq!(resolver.text(&namehash, &key), Some(value.clone()));
+        assert_eq!(events.len(), 1, "expected text event");
+        let (event_contract, topics, data) = events.get(0).unwrap();
+        assert_eq!(event_contract, resolver_id);
+
+        let topic_symbol =
+            Symbol::try_from_val(&e, &topics.get(0).expect("topic symbol missing")).unwrap();
+        assert_eq!(topic_symbol, Symbol::new(&e, "text_changed"));
+
+        let topic_namehash =
+            BytesN::<32>::try_from_val(&e, &topics.get(1).expect("topic namehash missing"))
+                .unwrap();
+        assert_eq!(topic_namehash, namehash);
+
+        let data_map = Map::<Symbol, Bytes>::try_from_val(&e, &data)
+            .expect("unable to decode text event data");
+        let recorded_key = data_map
+            .get(Symbol::new(&e, "key"))
+            .expect("key missing in event");
+        assert_eq!(recorded_key, key);
+    }
+
 }

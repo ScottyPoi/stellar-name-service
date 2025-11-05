@@ -98,6 +98,14 @@ impl Resolver {
         storage.get(&key)
     }
 
+    pub fn text(env: Env, namehash: BytesN<32>, key: Bytes) -> Option<Bytes> {
+        ensure_initialized(&env);
+        validate_text_key(&env, &key);
+        let storage = env.storage().persistent();
+        let data_key = text_storage_key(&env, &namehash, &key);
+        storage.get(&data_key)
+    }
+
 }
 
 #[cfg(test)]

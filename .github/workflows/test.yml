@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  test:
+  test-contracts:
     runs-on: ubuntu-latest
     
     steps:
@@ -36,6 +36,13 @@ jobs:
 
       - name: Run tests
         run: just test
+
+  test-indexer:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

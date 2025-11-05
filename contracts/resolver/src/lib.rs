@@ -1,6 +1,7 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Bytes, BytesN, Env};
+#[cfg(test)]
+extern crate std;
 
 use soroban_sdk::{
     contract, contracterror, contractevent, contractimpl, panic_with_error, Address, Bytes, BytesN,
@@ -150,7 +151,45 @@ impl Resolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::Env;
+    use soroban_sdk::{
+        contract, contractimpl, contracttype,
+        testutils::{Address as _, Events},
+        Address, Bytes, BytesN, Env, Map, Symbol, TryFromVal,
+    };
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    #[contract]
+    pub struct MockRegistry;
+
+    #[derive(Clone)]
+    #[contracttype]
+    enum MockRegistryKey {
+        Owner(BytesN<32>),
+    }
+
+    #[contractimpl]
+    impl MockRegistry {
+        pub fn owner(env: Env, namehash: BytesN<32>) -> Address {
+            env.storage()
+                .persistent()
+                .get(&MockRegistryKey::Owner(namehash))
+                .unwrap_or_else(|| panic!("mock registry owner not set"))
+        }
+
+        pub fn set_owner(env: Env, namehash: BytesN<32>, owner: Address) {
+            env.storage()
+                .persistent()
+                .set(&MockRegistryKey::Owner(namehash), &owner);
+        }
+    }
+
+    fn namehash(env: &Env, byte: u8) -> BytesN<32> {
+        BytesN::from_array(env, &[byte; 32])
+    }
+
+    fn bytes(env: &Env, data: &[u8]) -> Bytes {
+        Bytes::from_slice(env, data)
+    }
 
     #[test]
     fn it_compiles_and_returns_version() {

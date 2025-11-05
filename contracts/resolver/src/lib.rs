@@ -270,4 +270,29 @@ mod tests {
             .expect("addr missing in event");
         assert_eq!(recorded_addr, addr);
     }
+
+    #[test]
+    fn set_addr_rejects_non_owner() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let resolver_id = e.register(Resolver, ());
+        let registry_id = e.register(MockRegistry, ());
+        let resolver = ResolverClient::new(&e, &resolver_id);
+        let registry = MockRegistryClient::new(&e, &registry_id);
+
+        resolver.init(&registry_id);
+
+        let namehash = namehash(&e, 3);
+        let owner = Address::generate(&e);
+        let stranger = Address::generate(&e);
+        let addr = Address::generate(&e);
+
+        registry.set_owner(&namehash, &owner);
+
+        let attempt = catch_unwind(AssertUnwindSafe(|| {
+            resolver.set_addr(&stranger, &namehash, &addr)
+        }));
+        assert!(attempt.is_err());
+        assert!(resolver.addr(&namehash).is_none());
+    }
 }

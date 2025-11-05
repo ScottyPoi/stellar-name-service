@@ -38,6 +38,12 @@ fn registry_storage_key(env: &Env) -> Bytes {
     Bytes::from_slice(env, keys::REGISTRY)
 }
 
+fn addr_storage_key(env: &Env, namehash: &BytesN<32>) -> Bytes {
+    let mut key = Bytes::from_slice(env, keys::ADDR);
+    key.extend_from_array(&namehash.to_array());
+    key
+}
+
 #[contract]
 pub struct Resolver;
 

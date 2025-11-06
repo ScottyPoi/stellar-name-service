@@ -450,7 +450,12 @@ impl Registrar {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::{
+        contract, contractimpl, contracttype,
+        testutils::{Address as _, Events, Ledger},
+        Address, Bytes, BytesN, Env, Symbol, TryFromVal,
+    };
+    use std::panic::{catch_unwind, AssertUnwindSafe};
 
     #[test]
     fn test_placeholder() {

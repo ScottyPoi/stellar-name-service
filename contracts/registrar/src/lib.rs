@@ -518,9 +518,18 @@ mod test {
                 .unwrap_or_else(|| panic!("expiry not set"))
         }
     }
+
+    fn setup_env() -> (Env, Address, Address, Address) {
         let env = Env::default();
-        let admin = Address::random(&env);
-        let registry = Address::random(&env);
+        let registry_id = env.register(MockRegistry, ());
+        let registrar_id = env.register(Registrar, ());
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let admin = Address::generate(&env);
+        let tld = Bytes::from_slice(&env, b"stellar");
+        registrar_client.init(&registry_id, &tld, &admin);
+        env.mock_all_auths();
+        (env, registry_id, registrar_id, admin)
+    }
         let tld = Bytes::from_slice(&env, b"stellar");
         Registrar::init(env.clone(), registry, tld, admin);
         // TODO: Expand unit tests once logic is implemented

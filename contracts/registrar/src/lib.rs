@@ -283,6 +283,24 @@ impl Registrar {
         let params = default_params();
         write_params(&env, &params);
     }
+
+    /// Record commitment timestamp for commit–reveal.
+    pub fn commit(env: Env, caller: Address, commitment: BytesN<32>) {
+        ensure_initialized(&env);
+        caller.require_auth();
+        let key = commitment_key(&env, &commitment);
+        let storage = env.storage().persistent();
+        if storage.has(&key) {
+            panic_with_error!(&env, RegistrarError::CommitmentExists);
+        }
+        let ts = env.ledger().timestamp();
+        store_commitment(&env, &commitment, ts);
+        env.events().publish(
+            (Symbol::new(&env, "commit_made"), commitment.clone()),
+            EvtCommitMade { commitment, at: ts },
+        );
+    }
+
     pub fn register(
         env: Env,
         _caller: Address,

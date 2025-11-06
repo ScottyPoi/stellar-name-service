@@ -698,5 +698,34 @@ mod test {
         assert!(registrar_client.available(&label));
     }
 
+    #[test]
+    fn unavailable_when_in_grace() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(10_000);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "grace");
+        let secret = make_bytes(&env, b"abc");
+
+        let namehash = register_name(
+            &env,
+            &registry_client,
+            &registrar_client,
+            &caller,
+            &label,
+            &owner,
+            &secret,
+            None,
+        );
+        assert!(!registrar_client.available(&label));
+
+        let expires = registry_client.expires(&namehash);
+        env.ledger()
+            .set_timestamp(expires + registrar_client.params().grace_period_secs);
+        assert!(!registrar_client.available(&label));
+    }
+
     }
 }

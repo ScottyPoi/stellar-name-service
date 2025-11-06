@@ -575,8 +575,16 @@ mod test {
         assert_eq!(stored_owner, *owner);
         namehash
     }
+
+    #[test]
+    fn init_only_once() {
+        let (env, registry_id, registrar_id, admin) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
         let tld = Bytes::from_slice(&env, b"stellar");
-        Registrar::init(env.clone(), registry, tld, admin);
-        // TODO: Expand unit tests once logic is implemented
+        let second = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.init(&registry_id, &tld, &admin);
+        }));
+        assert!(second.is_err());
+    }
     }
 }

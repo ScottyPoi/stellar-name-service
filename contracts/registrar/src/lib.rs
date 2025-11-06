@@ -301,25 +301,60 @@ impl Registrar {
         );
     }
 
+    /// Finalize name registration after commitment matures.
+    #[allow(clippy::too_many_arguments)]
     pub fn register(
         env: Env,
-        _caller: Address,
-        _label: Bytes,
-        _owner: Address,
-        _secret: Bytes,
-        _resolver: Option<Address>,
+        caller: Address,
+        label: Bytes,
+        owner: Address,
+        secret: Bytes,
+        resolver: Option<Address>,
     ) -> BytesN<32> {
-        // TODO: Verify commitment, check availability, set owner in Registry, emit event
-        BytesN::from_array(&env, &[0u8; 32])
-    }
+        ensure_initialized(&env);
+        caller.require_auth();
+        validate_label(&env, &label);
 
-    pub fn renew(env: Env, _caller: Address, _label: Bytes) {
-        // TODO: Extend expiry in Registry; emit EvtNameRenewed
-    }
+        let params = read_params(&env);
+        let registry = read_registry(&env);
+        let now = env.ledger().timestamp();
+        let commitment = compute_commitment(&env, &label, &owner, &secret);
 
-    pub fn available(env: Env, _label: Bytes) -> bool {
-        // TODO: Query Registry and determine availability
-        false
+        let stored = commitment_timestamp(&env, &commitment)
+            .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::CommitmentMissingOrStale));
+        let age = if now >= stored { now - stored } else { 0 };
+        if age < params.commit_min_age_secs || age > params.commit_max_age_secs {
+            panic_with_error!(&env, RegistrarError::CommitmentMissingOrStale);
+        }
+        remove_commitment(&env, &commitment);
+
+        if !Self::available(env.clone(), label.clone()) {
+            panic_with_error!(&env, RegistrarError::NameNotAvailable);
+        }
+
+        let namehash = compute_namehash(&env, &label);
+
+        registry_api::set_owner(&env, &registry, &namehash, &owner);
+        if let Some(resolver_addr) = resolver.as_ref() {
+            registry_api::set_resolver(&env, &registry, &namehash, resolver_addr);
+        }
+        registry_api::renew(&env, &registry, &namehash);
+
+        let expires_at = registry_api::expires(&env, &registry, &namehash).unwrap_or_else(|| {
+            now.checked_add(params.renew_extension_secs)
+                .unwrap_or(u64::MAX)
+        });
+
+        env.events().publish(
+            (Symbol::new(&env, "name_registered"), namehash.clone()),
+            EvtNameRegistered {
+                namehash: namehash.clone(),
+                owner: owner.clone(),
+                expires_at,
+            },
+        );
+
+        namehash
     }
 
     pub fn registry(env: Env) -> Address {

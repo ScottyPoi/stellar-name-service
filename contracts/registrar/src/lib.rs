@@ -357,6 +357,33 @@ impl Registrar {
         namehash
     }
 
+    /// Extend an existing registration's expiry.
+    pub fn renew(env: Env, caller: Address, label: Bytes) {
+        ensure_initialized(&env);
+        caller.require_auth();
+        validate_label(&env, &label);
+
+        let registry = read_registry(&env);
+        let namehash = compute_namehash(&env, &label);
+        let owner = registry_api::owner(&env, &registry, &namehash)
+            .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::NotOwner));
+        if owner != caller {
+            panic_with_error!(&env, RegistrarError::NotOwner);
+        }
+
+        registry_api::renew(&env, &registry, &namehash);
+        let expires_at = registry_api::expires(&env, &registry, &namehash)
+            .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::NotInitialized));
+
+        env.events().publish(
+            (Symbol::new(&env, "name_renewed"), namehash.clone()),
+            EvtNameRenewed {
+                namehash,
+                expires_at,
+            },
+        );
+    }
+
     pub fn registry(env: Env) -> Address {
         // TODO: Return stored Registry address
         Address::random(&env)

@@ -219,6 +219,7 @@ mod registry_api {
 pub struct Registrar;
 
 #[contracttype]
+#[derive(Clone)]
 pub struct RegistrarParams {
     pub min_label_len: u32,
     pub max_label_len: u32,
@@ -243,12 +244,14 @@ pub enum RegistrarError {
 }
 
 #[contracttype]
+#[derive(Clone)]
 pub struct EvtCommitMade {
     pub commitment: BytesN<32>,
     pub at: u64,
 }
 
 #[contracttype]
+#[derive(Clone)]
 pub struct EvtNameRegistered {
     pub namehash: BytesN<32>,
     pub owner: Address,
@@ -256,6 +259,7 @@ pub struct EvtNameRegistered {
 }
 
 #[contracttype]
+#[derive(Clone)]
 pub struct EvtNameRenewed {
     pub namehash: BytesN<32>,
     pub expires_at: u64,

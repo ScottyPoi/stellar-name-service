@@ -457,8 +457,67 @@ mod test {
     };
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
-    #[test]
-    fn test_placeholder() {
+    const MOCK_RENEW_EXTENSION: u64 = 31_536_000;
+
+    #[contract]
+    pub struct MockRegistry;
+
+    #[contracttype]
+    #[derive(Clone)]
+    enum MockRegistryKey {
+        Owner(BytesN<32>),
+        Resolver(BytesN<32>),
+        Expires(BytesN<32>),
+    }
+
+    #[contractimpl]
+    impl MockRegistry {
+        pub fn owner(env: Env, namehash: BytesN<32>) -> Address {
+            env.storage()
+                .persistent()
+                .get(&MockRegistryKey::Owner(namehash.clone()))
+                .unwrap_or_else(|| panic!("owner not set"))
+        }
+
+        pub fn set_owner(env: Env, namehash: BytesN<32>, owner: Address) {
+            env.storage()
+                .persistent()
+                .set(&MockRegistryKey::Owner(namehash), &owner);
+        }
+
+        pub fn set_resolver(env: Env, namehash: BytesN<32>, resolver: Address) {
+            env.storage()
+                .persistent()
+                .set(&MockRegistryKey::Resolver(namehash), &resolver);
+        }
+
+        pub fn resolver(env: Env, namehash: BytesN<32>) -> Option<Address> {
+            env.storage()
+                .persistent()
+                .get(&MockRegistryKey::Resolver(namehash))
+        }
+
+        pub fn renew(env: Env, namehash: BytesN<32>) {
+            let now = env.ledger().timestamp();
+            let current = env
+                .storage()
+                .persistent()
+                .get(&MockRegistryKey::Expires(namehash.clone()))
+                .unwrap_or(0u64);
+            let base = if current > now { current } else { now };
+            let new_expiry = base.checked_add(MOCK_RENEW_EXTENSION).unwrap_or(u64::MAX);
+            env.storage()
+                .persistent()
+                .set(&MockRegistryKey::Expires(namehash), &new_expiry);
+        }
+
+        pub fn expires(env: Env, namehash: BytesN<32>) -> u64 {
+            env.storage()
+                .persistent()
+                .get(&MockRegistryKey::Expires(namehash.clone()))
+                .unwrap_or_else(|| panic!("expiry not set"))
+        }
+    }
         let env = Env::default();
         let admin = Address::random(&env);
         let registry = Address::random(&env);

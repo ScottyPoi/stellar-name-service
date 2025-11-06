@@ -228,16 +228,18 @@ pub struct RegistrarParams {
     pub grace_period_secs: u64,
 }
 
-#[contracttype]
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
 pub enum RegistrarError {
-    AlreadyInitialized,
-    NotInitialized,
-    NotAdmin,
-    NotOwner,
-    InvalidLabel,
-    CommitmentExists,
-    CommitmentMissingOrStale,
-    NameNotAvailable,
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
+    NotAdmin = 3,
+    NotOwner = 4,
+    InvalidLabel = 5,
+    CommitmentExists = 6,
+    CommitmentMissingOrStale = 7,
+    NameNotAvailable = 8,
 }
 
 #[contracttype]

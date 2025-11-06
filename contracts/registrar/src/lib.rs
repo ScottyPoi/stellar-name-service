@@ -213,8 +213,6 @@ mod registry_api {
 }
 
 /// Registrar contract for the `.stellar` namespace.
-/// Provides commit–reveal registration, renewals, and availability checks.
-/// Interacts with the Registry (and optionally Resolver) contracts.
 #[contract]
 pub struct Registrar;
 

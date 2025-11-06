@@ -727,5 +727,41 @@ mod test {
         assert!(!registrar_client.available(&label));
     }
 
+    #[test]
+    fn register_when_unavailable_fails() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(12_000);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "taken");
+        let secret = make_bytes(&env, b"secret");
+
+        register_name(
+            &env,
+            &registry_client,
+            &registrar_client,
+            &caller,
+            &label,
+            &owner,
+            &secret,
+            None,
+        );
+
+        let new_owner = Address::generate(&env);
+        let new_secret = make_bytes(&env, b"secret2");
+        let commitment = make_commitment(&env, &label, &new_owner, &new_secret);
+        registrar_client.commit(&caller, &commitment);
+        env.ledger()
+            .set_timestamp(12_000 + registrar_client.params().commit_min_age_secs);
+
+        let none_resolver: Option<Address> = None;
+        let attempt = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.register(&caller, &label, &new_owner, &new_secret, &none_resolver);
+        }));
+        assert!(attempt.is_err());
+    }
+
     }
 }

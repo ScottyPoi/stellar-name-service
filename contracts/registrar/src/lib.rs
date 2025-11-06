@@ -9,6 +9,14 @@ use soroban_sdk::{
     Env, Error, IntoVal, Symbol,
 };
 
+mod keys {
+    pub const REGISTRY: &[u8] = b"REG_ADDR";
+    pub const TLD: &[u8] = b"REG_TLD";
+    pub const PARAMS: &[u8] = b"REG_PARM";
+    pub const ADMIN: &[u8] = b"REG_ADMN";
+    pub const COMM: &[u8] = b"REG_COMM";
+}
+
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.
 /// Interacts with the Registry (and optionally Resolver) contracts.

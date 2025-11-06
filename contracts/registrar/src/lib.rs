@@ -763,5 +763,81 @@ mod test {
         assert!(attempt.is_err());
     }
 
+    #[test]
+    fn renew_happy_path() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(20_000);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "renew");
+        let secret = make_bytes(&env, b"renew");
+
+        let namehash = register_name(
+            &env,
+            &registry_client,
+            &registrar_client,
+            &caller,
+            &label,
+            &owner,
+            &secret,
+            None,
+        );
+        let before = registry_client.expires(&namehash);
+
+        env.ledger().set_timestamp(before + 1);
+        registrar_client.renew(&caller, &label);
+        let events = env.events().all();
+        let after = registry_client.expires(&namehash);
+        assert!(after > before);
+
+        let mut found = false;
+        for idx in 0..events.len() {
+            let (contract_id, topics, data) = events.get(idx).unwrap();
+            if contract_id != registrar_id {
+                continue;
+            }
+            let symbol = Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap();
+            if symbol != Symbol::new(&env, "name_renewed") {
+                continue;
+            }
+            let evt = EvtNameRenewed::try_from_val(&env, &data).unwrap();
+            assert_eq!(evt.namehash, namehash);
+            assert_eq!(evt.expires_at, after);
+            found = true;
+            break;
+        }
+        assert!(found, "expected name_renewed event");
+    }
+
+    #[test]
+    fn renew_not_owner_rejected() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(30_000);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "guard");
+        let secret = make_bytes(&env, b"guard");
+        register_name(
+            &env,
+            &registry_client,
+            &registrar_client,
+            &caller,
+            &label,
+            &owner,
+            &secret,
+            None,
+        );
+
+        let attacker = Address::generate(&env);
+        let attempt = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.renew(&attacker, &label);
+        }));
+        assert!(attempt.is_err());
+    }
+
     }
 }

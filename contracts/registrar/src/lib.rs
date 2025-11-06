@@ -839,5 +839,19 @@ mod test {
         assert!(attempt.is_err());
     }
 
+    #[test]
+    fn invalid_label_rejected() {
+        let (env, _registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let secret = make_bytes(&env, b"x");
+        let empty_label = Bytes::from_slice(&env, b"");
+        let none_resolver: Option<Address> = None;
+        let attempt = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.register(&caller, &empty_label, &owner, &secret, &none_resolver);
+        }));
+        assert!(attempt.is_err());
+    }
     }
 }

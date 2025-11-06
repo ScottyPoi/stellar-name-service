@@ -530,6 +530,51 @@ mod test {
         env.mock_all_auths();
         (env, registry_id, registrar_id, admin)
     }
+
+    fn make_label(env: &Env, text: &str) -> Bytes {
+        Bytes::from_slice(env, text.as_bytes())
+    }
+
+    fn make_bytes(env: &Env, data: &[u8]) -> Bytes {
+        Bytes::from_slice(env, data)
+    }
+
+    fn make_commitment(env: &Env, label: &Bytes, owner: &Address, secret: &Bytes) -> BytesN<32> {
+        super::compute_commitment(env, label, owner, secret)
+    }
+
+    fn expected_namehash(env: &Env, label: &Bytes) -> BytesN<32> {
+        let tld = Bytes::from_slice(env, b"stellar");
+        let root = BytesN::<32>::from_array(env, &[0u8; 32]);
+        let tld_hash = env.crypto().sha256(&tld).to_bytes();
+        let node = super::fold_hash(env, &root, &tld_hash);
+        let label_hash = env.crypto().sha256(label).to_bytes();
+        super::fold_hash(env, &node, &label_hash)
+    }
+
+    fn register_name(
+        env: &Env,
+        registry_client: &MockRegistryClient,
+        registrar_client: &RegistrarClient,
+        caller: &Address,
+        label: &Bytes,
+        owner: &Address,
+        secret: &Bytes,
+        resolver: Option<&Address>,
+    ) -> BytesN<32> {
+        let commitment = make_commitment(env, label, owner, secret);
+        registrar_client.commit(caller, &commitment);
+        let params = registrar_client.params();
+        let now = env.ledger().timestamp();
+        env.ledger().set_timestamp(now + params.commit_min_age_secs);
+        let resolver_arg = resolver.cloned();
+        let result = registrar_client.register(caller, label, owner, secret, &resolver_arg);
+        let namehash = expected_namehash(env, label);
+        assert_eq!(result, namehash);
+        let stored_owner = registry_client.owner(&namehash);
+        assert_eq!(stored_owner, *owner);
+        namehash
+    }
         let tld = Bytes::from_slice(&env, b"stellar");
         Registrar::init(env.clone(), registry, tld, admin);
         // TODO: Expand unit tests once logic is implemented

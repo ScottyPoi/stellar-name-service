@@ -384,6 +384,40 @@ impl Registrar {
         );
     }
 
+    /// Return whether the label is currently available.
+    pub fn available(env: Env, label: Bytes) -> bool {
+        if label.is_empty() {
+            return false;
+        }
+        if env
+            .storage()
+            .persistent()
+            .has(&singleton_key(&env, keys::REGISTRY))
+            == false
+        {
+            return false;
+        }
+        let params = read_params(&env);
+        if label.len() < params.min_label_len || label.len() > params.max_label_len {
+            return false;
+        }
+        let registry = read_registry(&env);
+        let namehash = compute_namehash(&env, &label);
+
+        let owner = registry_api::owner(&env, &registry, &namehash);
+        if owner.is_none() {
+            return true;
+        }
+
+        let expires_at = registry_api::expires(&env, &registry, &namehash);
+        match expires_at {
+            None => true,
+            Some(ts) => {
+                let now = env.ledger().timestamp();
+                grace_expired(now, ts, params.grace_period_secs)
+            }
+        }
+    }
     pub fn registry(env: Env) -> Address {
         // TODO: Return stored Registry address
         Address::random(&env)

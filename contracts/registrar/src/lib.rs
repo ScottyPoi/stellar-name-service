@@ -853,5 +853,34 @@ mod test {
         }));
         assert!(attempt.is_err());
     }
+
+    #[test]
+    fn commitment_replay_disallowed() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(40_000);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "single");
+        let secret = make_bytes(&env, b"s1");
+
+        env.ledger().set_timestamp(40_000);
+        register_name(
+            &env,
+            &registry_client,
+            &registrar_client,
+            &caller,
+            &label,
+            &owner,
+            &secret,
+            None,
+        );
+
+        let none_resolver: Option<Address> = None;
+        let replay = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.register(&caller, &label, &owner, &secret, &none_resolver);
+        }));
+        assert!(replay.is_err());
     }
 }

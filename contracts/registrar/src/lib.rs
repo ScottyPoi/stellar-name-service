@@ -267,14 +267,22 @@ pub struct EvtNameRenewed {
 
 #[contractimpl]
 impl Registrar {
-    pub fn init(env: Env, _registry: Address, _tld: Bytes, _admin: Address) {
-        // TODO: Implement initialization logic
+    /// One-time initializer.
+    pub fn init(env: Env, registry: Address, tld: Bytes, admin: Address) {
+        let storage = env.storage().persistent();
+        let key = singleton_key(&env, keys::REGISTRY);
+        if storage.has(&key) {
+            panic_with_error!(&env, RegistrarError::AlreadyInitialized);
+        }
+        if tld.is_empty() {
+            panic_with_error!(&env, RegistrarError::InvalidLabel);
+        }
+        write_registry(&env, &registry);
+        write_tld(&env, &tld);
+        write_admin(&env, &admin);
+        let params = default_params();
+        write_params(&env, &params);
     }
-
-    pub fn commit(env: Env, _caller: Address, _commitment: BytesN<32>) {
-        // TODO: Store commitment with timestamp; emit EvtCommitMade
-    }
-
     pub fn register(
         env: Env,
         _caller: Address,

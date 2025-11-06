@@ -167,6 +167,51 @@ fn grace_expired(now: u64, expires_at: u64, grace: u64) -> bool {
     now > grace_end
 }
 
+mod registry_api {
+    use super::*;
+
+    pub fn set_owner(env: &Env, registry: &Address, namehash: &BytesN<32>, owner: &Address) {
+        env.invoke_contract::<()>(
+            &registry,
+            &Symbol::new(env, "set_owner"),
+            (namehash, owner).into_val(env),
+        );
+    }
+
+    pub fn set_resolver(env: &Env, registry: &Address, namehash: &BytesN<32>, resolver: &Address) {
+        env.invoke_contract::<()>(
+            &registry,
+            &Symbol::new(env, "set_resolver"),
+            (namehash, resolver).into_val(env),
+        );
+    }
+
+    pub fn renew(env: &Env, registry: &Address, namehash: &BytesN<32>) {
+        env.invoke_contract::<()>(
+            &registry,
+            &Symbol::new(env, "renew"),
+            (namehash,).into_val(env),
+        );
+    }
+
+    pub fn owner(env: &Env, registry: &Address, namehash: &BytesN<32>) -> Option<Address> {
+        let args = (namehash.clone(),).into_val(env);
+        match env.try_invoke_contract::<Address, Error>(&registry, &Symbol::new(env, "owner"), args)
+        {
+            Ok(Ok(address)) => Some(address),
+            _ => None,
+        }
+    }
+
+    pub fn expires(env: &Env, registry: &Address, namehash: &BytesN<32>) -> Option<u64> {
+        let args = (namehash.clone(),).into_val(env);
+        match env.try_invoke_contract::<u64, Error>(&registry, &Symbol::new(env, "expires"), args) {
+            Ok(Ok(ts)) => Some(ts),
+            _ => None,
+        }
+    }
+}
+
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.
 /// Interacts with the Registry (and optionally Resolver) contracts.

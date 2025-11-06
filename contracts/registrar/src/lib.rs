@@ -144,6 +144,21 @@ fn remove_commitment(env: &Env, commitment: &BytesN<32>) {
     storage.remove(&key);
 }
 
+fn ensure_initialized(env: &Env) {
+    let storage = env.storage().persistent();
+    let key = singleton_key(env, keys::REGISTRY);
+    if !storage.has(&key) {
+        panic_with_error!(env, RegistrarError::NotInitialized);
+    }
+}
+
+fn ensure_admin(env: &Env, caller: &Address) {
+    let admin = read_admin(env);
+    if admin != *caller {
+        panic_with_error!(env, RegistrarError::NotAdmin);
+    }
+}
+
 
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.

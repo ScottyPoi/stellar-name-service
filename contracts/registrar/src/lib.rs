@@ -17,6 +17,17 @@ mod keys {
     pub const COMM: &[u8] = b"REG_COMM";
 }
 
+fn default_params() -> RegistrarParams {
+    RegistrarParams {
+        min_label_len: 1,
+        max_label_len: 63,
+        commit_min_age_secs: 60,
+        commit_max_age_secs: 86_400,
+        renew_extension_secs: 31_536_000,
+        grace_period_secs: 7_776_000,
+    }
+}
+
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.
 /// Interacts with the Registry (and optionally Resolver) contracts.

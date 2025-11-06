@@ -641,5 +641,34 @@ mod test {
         }
         assert!(found, "expected name_registered event");
     }
+
+    #[test]
+    fn commitment_window_invalid() {
+        let (env, _registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "fresh");
+        let secret = make_bytes(&env, b"123");
+        let commitment = make_commitment(&env, &label, &owner, &secret);
+        let none_resolver: Option<Address> = None;
+        let without_commit = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.register(&caller, &label, &owner, &secret, &none_resolver);
+        }));
+        assert!(without_commit.is_err());
+
+        registrar_client.commit(&caller, &commitment);
+        let too_fresh = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.register(&caller, &label, &owner, &secret, &none_resolver);
+        }));
+        assert!(too_fresh.is_err());
+
+        env.ledger()
+            .set_timestamp(registrar_client.params().commit_max_age_secs + 10);
+        let too_old = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.register(&caller, &label, &owner, &secret, &none_resolver);
+        }));
+        assert!(too_old.is_err());
+    }
     }
 }

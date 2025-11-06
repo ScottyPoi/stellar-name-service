@@ -433,6 +433,12 @@ impl Registrar {
         }
         write_params(&env, &params);
     }
+
+    /// Fetch current registrar parameters.
+    pub fn params(env: Env) -> RegistrarParams {
+        ensure_initialized(&env);
+        read_params(&env)
+    }
     pub fn registry(env: Env) -> Address {
         // TODO: Return stored Registry address
         Address::random(&env)

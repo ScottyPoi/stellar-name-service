@@ -94,6 +94,13 @@ fn write_admin(env: &Env, admin: &Address) {
     storage.set(&key, admin);
 }
 
+fn validate_label(env: &Env, label: &Bytes) {
+    let params = read_params(env);
+    let len = label.len();
+    if len < params.min_label_len || len > params.max_label_len {
+        panic_with_error!(env, RegistrarError::InvalidLabel);
+    }
+}
 
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.

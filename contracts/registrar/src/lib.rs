@@ -38,6 +38,38 @@ fn commitment_key(env: &Env, commitment: &BytesN<32>) -> Bytes {
     key
 }
 
+fn read_registry(env: &Env) -> Address {
+    let storage = env.storage().persistent();
+    let key = singleton_key(env, keys::REGISTRY);
+    storage.get(&key).unwrap_or_else(|| {
+        panic_with_error!(env, RegistrarError::NotInitialized);
+    })
+}
+
+fn read_tld(env: &Env) -> Bytes {
+    let storage = env.storage().persistent();
+    let key = singleton_key(env, keys::TLD);
+    storage.get(&key).unwrap_or_else(|| {
+        panic_with_error!(env, RegistrarError::NotInitialized);
+    })
+}
+
+fn read_admin(env: &Env) -> Address {
+    let storage = env.storage().persistent();
+    let key = singleton_key(env, keys::ADMIN);
+    storage.get(&key).unwrap_or_else(|| {
+        panic_with_error!(env, RegistrarError::NotInitialized);
+    })
+}
+
+fn read_params(env: &Env) -> RegistrarParams {
+    let storage = env.storage().persistent();
+    let key = singleton_key(env, keys::PARAMS);
+    storage.get(&key).unwrap_or_else(|| {
+        panic_with_error!(env, RegistrarError::NotInitialized);
+    })
+}
+
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.
 /// Interacts with the Registry (and optionally Resolver) contracts.

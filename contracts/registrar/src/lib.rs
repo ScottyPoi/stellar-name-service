@@ -586,5 +586,60 @@ mod test {
         }));
         assert!(second.is_err());
     }
+
+    #[test]
+    fn commit_register_happy_path() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(1_000);
+        let caller = Address::generate(&env);
+        let owner = Address::generate(&env);
+        let resolver = Address::generate(&env);
+        let label = make_label(&env, "alice");
+        let secret = make_bytes(&env, b"secret");
+
+        let commitment = make_commitment(&env, &label, &owner, &secret);
+        registrar_client.commit(&caller, &commitment);
+
+        let params = registrar_client.params();
+        env.ledger()
+            .set_timestamp(1_000 + params.commit_min_age_secs);
+        let resolver_arg = Some(resolver.clone());
+        let namehash = registrar_client.register(&caller, &label, &owner, &secret, &resolver_arg);
+        let events = env.events().all();
+
+        let stored_owner = registry_client.owner(&namehash);
+        assert_eq!(stored_owner, owner);
+
+        let expires = registry_client.expires(&namehash);
+        assert_eq!(
+            expires,
+            env.ledger()
+                .timestamp()
+                .checked_add(MOCK_RENEW_EXTENSION)
+                .unwrap()
+        );
+
+        let stored_resolver = registry_client.resolver(&namehash).unwrap();
+        assert_eq!(stored_resolver, resolver);
+        let mut found = false;
+        for idx in 0..events.len() {
+            let (contract_id, topics, data) = events.get(idx).unwrap();
+            if contract_id != registrar_id {
+                continue;
+            }
+            let symbol = Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap();
+            if symbol != Symbol::new(&env, "name_registered") {
+                continue;
+            }
+            let evt = EvtNameRegistered::try_from_val(&env, &data).unwrap();
+            assert_eq!(evt.namehash, namehash);
+            assert_eq!(evt.owner, owner);
+            assert_eq!(evt.expires_at, expires);
+            found = true;
+        }
+        assert!(found, "expected name_registered event");
+    }
     }
 }

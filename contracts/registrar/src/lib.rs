@@ -102,6 +102,49 @@ fn validate_label(env: &Env, label: &Bytes) {
     }
 }
 
+fn compute_commitment(env: &Env, label: &Bytes, owner: &Address, secret: &Bytes) -> BytesN<32> {
+    let mut data = Bytes::new(env);
+    data.append(label);
+    let owner_bytes = owner.clone().to_xdr(env);
+    data.append(&owner_bytes);
+    data.append(secret);
+    env.crypto().sha256(&data).to_bytes()
+}
+
+fn fold_hash(env: &Env, parent: &BytesN<32>, label_hash: &BytesN<32>) -> BytesN<32> {
+    let mut data = Bytes::from_array(env, &parent.to_array());
+    data.extend_from_array(&label_hash.to_array());
+    env.crypto().sha256(&data).to_bytes()
+}
+
+fn compute_namehash(env: &Env, label: &Bytes) -> BytesN<32> {
+    let tld = read_tld(env);
+    let root = BytesN::<32>::from_array(env, &[0u8; 32]);
+    let tld_hash = env.crypto().sha256(&tld).to_bytes();
+    let node = fold_hash(env, &root, &tld_hash);
+    let label_hash = env.crypto().sha256(label).to_bytes();
+    fold_hash(env, &node, &label_hash)
+}
+
+fn commitment_timestamp(env: &Env, commitment: &BytesN<32>) -> Option<u64> {
+    let storage = env.storage().persistent();
+    let key = commitment_key(env, commitment);
+    storage.get(&key)
+}
+
+fn store_commitment(env: &Env, commitment: &BytesN<32>, ts: u64) {
+    let storage = env.storage().persistent();
+    let key = commitment_key(env, commitment);
+    storage.set(&key, &ts);
+}
+
+fn remove_commitment(env: &Env, commitment: &BytesN<32>) {
+    let storage = env.storage().persistent();
+    let key = commitment_key(env, commitment);
+    storage.remove(&key);
+}
+
+
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.
 /// Interacts with the Registry (and optionally Resolver) contracts.

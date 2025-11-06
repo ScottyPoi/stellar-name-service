@@ -159,6 +159,13 @@ fn ensure_admin(env: &Env, caller: &Address) {
     }
 }
 
+fn grace_expired(now: u64, expires_at: u64, grace: u64) -> bool {
+    if now <= expires_at {
+        return false;
+    }
+    let grace_end = expires_at.checked_add(grace).unwrap_or(u64::MAX);
+    now > grace_end
+}
 
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.

@@ -418,6 +418,21 @@ impl Registrar {
             }
         }
     }
+
+    /// Update registrar parameters (admin only).
+    pub fn set_params(env: Env, caller: Address, params: RegistrarParams) {
+        ensure_initialized(&env);
+        caller.require_auth();
+        ensure_admin(&env, &caller);
+        if params.min_label_len == 0
+            || params.min_label_len > params.max_label_len
+            || params.commit_min_age_secs == 0
+            || params.commit_min_age_secs > params.commit_max_age_secs
+        {
+            panic_with_error!(&env, RegistrarError::InvalidLabel);
+        }
+        write_params(&env, &params);
+    }
     pub fn registry(env: Env) -> Address {
         // TODO: Return stored Registry address
         Address::random(&env)

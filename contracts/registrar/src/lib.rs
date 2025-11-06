@@ -28,6 +28,16 @@ fn default_params() -> RegistrarParams {
     }
 }
 
+fn singleton_key(env: &Env, tag: &[u8]) -> Bytes {
+    Bytes::from_slice(env, tag)
+}
+
+fn commitment_key(env: &Env, commitment: &BytesN<32>) -> Bytes {
+    let mut key = Bytes::from_slice(env, keys::COMM);
+    key.extend_from_array(&commitment.to_array());
+    key
+}
+
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.
 /// Interacts with the Registry (and optionally Resolver) contracts.

@@ -670,5 +670,33 @@ mod test {
         }));
         assert!(too_old.is_err());
     }
+
+    #[test]
+    fn availability_cycles_through_lifecycle() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(5_000);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "cycle");
+        let secret = make_bytes(&env, b"cycle_secret");
+
+        assert!(registrar_client.available(&label));
+
+        let commitment = make_commitment(&env, &label, &owner, &secret);
+        registrar_client.commit(&caller, &commitment);
+        env.ledger()
+            .set_timestamp(5_000 + registrar_client.params().commit_min_age_secs);
+        let none_resolver: Option<Address> = None;
+        let namehash = registrar_client.register(&caller, &label, &owner, &secret, &none_resolver);
+        assert!(!registrar_client.available(&label));
+
+        let expires = registry_client.expires(&namehash);
+        env.ledger()
+            .set_timestamp(expires + registrar_client.params().grace_period_secs + 1);
+        assert!(registrar_client.available(&label));
+    }
+
     }
 }

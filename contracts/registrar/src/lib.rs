@@ -439,9 +439,11 @@ impl Registrar {
         ensure_initialized(&env);
         read_params(&env)
     }
+
+    /// Stored registry address helper.
     pub fn registry(env: Env) -> Address {
-        // TODO: Return stored Registry address
-        Address::random(&env)
+        ensure_initialized(&env);
+        read_registry(&env)
     }
 }
 

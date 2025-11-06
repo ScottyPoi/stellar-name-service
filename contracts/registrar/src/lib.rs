@@ -70,6 +70,31 @@ fn read_params(env: &Env) -> RegistrarParams {
     })
 }
 
+fn write_params(env: &Env, params: &RegistrarParams) {
+    let storage = env.storage().persistent();
+    let key = singleton_key(env, keys::PARAMS);
+    storage.set(&key, params);
+}
+
+fn write_registry(env: &Env, registry: &Address) {
+    let storage = env.storage().persistent();
+    let key = singleton_key(env, keys::REGISTRY);
+    storage.set(&key, registry);
+}
+
+fn write_tld(env: &Env, tld: &Bytes) {
+    let storage = env.storage().persistent();
+    let key = singleton_key(env, keys::TLD);
+    storage.set(&key, tld);
+}
+
+fn write_admin(env: &Env, admin: &Address) {
+    let storage = env.storage().persistent();
+    let key = singleton_key(env, keys::ADMIN);
+    storage.set(&key, admin);
+}
+
+
 /// Registrar contract for the `.stellar` namespace.
 /// Provides commit–reveal registration, renewals, and availability checks.
 /// Interacts with the Registry (and optionally Resolver) contracts.

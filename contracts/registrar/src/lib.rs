@@ -321,7 +321,7 @@ impl Registrar {
 
         let stored = commitment_timestamp(&env, &commitment)
             .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::CommitmentMissingOrStale));
-        let age = if now >= stored { now - stored } else { 0 };
+        let age = now.saturating_sub(stored);
         if age < params.commit_min_age_secs || age > params.commit_max_age_secs {
             panic_with_error!(&env, RegistrarError::CommitmentMissingOrStale);
         }

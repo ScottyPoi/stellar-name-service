@@ -425,8 +425,11 @@ impl Registrar {
         ensure_admin(&env, &caller);
         if params.min_label_len == 0
             || params.min_label_len > params.max_label_len
+            || params.max_label_len > 63
             || params.commit_min_age_secs == 0
             || params.commit_min_age_secs > params.commit_max_age_secs
+            || params.renew_extension_secs == 0
+            || params.grace_period_secs == 0
         {
             panic_with_error!(&env, RegistrarError::InvalidLabel);
         }

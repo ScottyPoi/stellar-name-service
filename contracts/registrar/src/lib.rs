@@ -239,6 +239,7 @@ pub enum RegistrarError {
     CommitmentExists = 6,
     CommitmentMissingOrStale = 7,
     NameNotAvailable = 8,
+    ExpiryUnavailable = 9,
 }
 
 #[contracttype]
@@ -370,8 +371,9 @@ impl Registrar {
         }
 
         registry_api::renew(&env, &registry, &namehash);
-        let expires_at = registry_api::expires(&env, &registry, &namehash)
-            .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::NotInitialized));
+        let expires_at = registry_api::expires(&env, &registry, &namehash).unwrap_or_else(|| {
+            panic_with_error!(&env, RegistrarError::ExpiryUnavailable)
+        });
 
         env.events().publish(
             (Symbol::new(&env, "name_renewed"), namehash.clone()),

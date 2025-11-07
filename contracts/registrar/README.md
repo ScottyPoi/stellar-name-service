@@ -52,7 +52,7 @@ Helper functions in `lib.rs` centralize reading and writing these keys to avoid 
 All events use `#[contractevent]` for stable topics:
 
 ```rust
-EvtCommitMade { commitment, at }
+EvtCommitMade { commitment, at, label_len }
 EvtNameRegistered { namehash, owner, expires_at }
 EvtNameRenewed { namehash, expires_at }
 ```

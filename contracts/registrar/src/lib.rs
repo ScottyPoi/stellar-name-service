@@ -389,11 +389,10 @@ impl Registrar {
         if label.is_empty() {
             return false;
         }
-        if env
+        if !env
             .storage()
             .persistent()
             .has(&singleton_key(&env, keys::REGISTRY))
-            == false
         {
             return false;
         }

@@ -360,20 +360,23 @@ impl Registrar {
         if label.len() != stored.label_len {
             panic_with_error!(&env, RegistrarError::InvalidLabel);
         }
-        remove_commitment(&env, &commitment);
-        // Availability is checked after removing the commitment; a brief gap is acceptable
-        // because commit-reveal guarantees unique, one-shot commitments.
         if !Self::available(env.clone(), label.clone()) {
             panic_with_error!(&env, RegistrarError::NameNotAvailable);
         }
 
         let namehash = compute_namehash(&env, &label);
+        let registrar_addr = env.current_contract_address();
 
-        registry_api::set_owner(&env, &registry, &namehash, &owner);
+        // Registrar-first ownership: ensures Registry calls requiring owner auth succeed.
+        registry_api::set_owner(&env, &registry, &namehash, &registrar_addr);
         if let Some(resolver_addr) = resolver.as_ref() {
             registry_api::set_resolver(&env, &registry, &namehash, resolver_addr);
         }
         registry_api::renew(&env, &registry, &namehash);
+        registry_api::set_owner(&env, &registry, &namehash, &owner);
+
+        // Delete commitment after successful registration to prevent premature burn on failed attempts.
+        remove_commitment(&env, &commitment);
 
         let expires_at = registry_api::expires(&env, &registry, &namehash).unwrap_or_else(|| {
             now.checked_add(params.renew_extension_secs)
@@ -535,6 +538,75 @@ mod test {
         }
 
         pub fn renew(env: Env, namehash: BytesN<32>) {
+            let owner = env
+                .storage()
+                .persistent()
+                .get(&MockRegistryKey::Owner(namehash.clone()))
+                .unwrap_or_else(|| panic!("owner not set"));
+            owner.require_auth();
+            let now = env.ledger().timestamp();
+            let current = env
+                .storage()
+                .persistent()
+                .get(&MockRegistryKey::Expires(namehash.clone()))
+                .unwrap_or(0u64);
+            let base = if current > now { current } else { now };
+            let new_expiry = base.checked_add(MOCK_RENEW_EXTENSION).unwrap_or(u64::MAX);
+            env.storage()
+                .persistent()
+                .set(&MockRegistryKey::Expires(namehash), &new_expiry);
+        }
+
+        pub fn expires(env: Env, namehash: BytesN<32>) -> u64 {
+            env.storage()
+                .persistent()
+                .get(&MockRegistryKey::Expires(namehash.clone()))
+                .unwrap_or_else(|| panic!("expiry not set"))
+        }
+    }
+
+    #[contract]
+    pub struct MockRegistryOwnerAuth;
+
+    #[contractimpl]
+    impl MockRegistryOwnerAuth {
+        pub fn owner(env: Env, namehash: BytesN<32>) -> Address {
+            env.storage()
+                .persistent()
+                .get(&MockRegistryKey::Owner(namehash.clone()))
+                .unwrap_or_else(|| panic!("owner not set"))
+        }
+
+        pub fn set_owner(env: Env, namehash: BytesN<32>, owner: Address) {
+            env.storage()
+                .persistent()
+                .set(&MockRegistryKey::Owner(namehash), &owner);
+        }
+
+        pub fn set_resolver(env: Env, namehash: BytesN<32>, resolver: Address) {
+            env.storage()
+                .persistent()
+                .set(&MockRegistryKey::Resolver(namehash), &resolver);
+        }
+
+        pub fn resolver(env: Env, namehash: BytesN<32>) -> Option<Address> {
+            env.storage()
+                .persistent()
+                .get(&MockRegistryKey::Resolver(namehash))
+        }
+
+        pub fn renew(env: Env, namehash: BytesN<32>) {
+            let owner = env
+                .storage()
+                .persistent()
+                .get(&MockRegistryKey::Owner(namehash.clone()))
+                .unwrap_or_else(|| panic!("owner not set"));
+            owner.require_auth();
+            let invoker = env.invoker();
+            assert_eq!(
+                owner, invoker,
+                "owner must temporarily match the registrar when renewing"
+            );
             let now = env.ledger().timestamp();
             let current = env
                 .storage()
@@ -614,6 +686,10 @@ mod test {
         namehash
     }
 
+    fn commitment_exists(env: &Env, commitment: &BytesN<32>) -> bool {
+        super::commitment_info(env, commitment).is_some()
+    }
+
     #[test]
     fn init_only_once() {
         let (env, registry_id, registrar_id, admin) = setup_env();
@@ -679,6 +755,36 @@ mod test {
             found = true;
         }
         assert!(found, "expected name_registered event");
+    }
+
+    #[test]
+    fn register_handles_registry_owner_auth_requirements() {
+        let env = Env::default();
+        let registry_id = env.register(MockRegistryOwnerAuth, ());
+        let registrar_id = env.register(Registrar, ());
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let admin = Address::generate(&env);
+        let tld = Bytes::from_slice(&env, b"stellar");
+        registrar_client.init(&registry_id, &tld, &admin);
+        env.mock_all_auths();
+        env.ledger().set_timestamp(2_000);
+
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "ownerflow");
+        let secret = make_bytes(&env, b"flow_secret");
+        let commitment = make_commitment(&env, &label, &owner, &secret);
+        let label_len = label.len();
+        registrar_client.commit(&caller, &commitment, &label_len);
+
+        let params = registrar_client.params();
+        env.ledger()
+            .set_timestamp(2_000 + params.commit_min_age_secs);
+        let none_resolver: Option<Address> = None;
+        let namehash = registrar_client.register(&caller, &label, &owner, &secret, &none_resolver);
+
+        let registry_client = MockRegistryOwnerAuthClient::new(&env, &registry_id);
+        assert_eq!(registry_client.owner(&namehash), owner);
     }
 
     #[test]
@@ -803,6 +909,67 @@ mod test {
             registrar_client.register(&caller, &label, &new_owner, &new_secret, &none_resolver);
         }));
         assert!(attempt.is_err());
+    }
+
+    #[test]
+    fn commitment_deleted_only_after_successful_registration() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(14_000);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "locked");
+        let secret = make_bytes(&env, b"lock_secret");
+
+        register_name(
+            &env,
+            &registry_client,
+            &registrar_client,
+            &caller,
+            &label,
+            &owner,
+            &secret,
+            None,
+        );
+
+        env.ledger().set_timestamp(15_000);
+        let challenger = Address::generate(&env);
+        let challenger_secret = make_bytes(&env, b"challenge");
+        let challenger_commitment = make_commitment(&env, &label, &challenger, &challenger_secret);
+        let label_len = label.len();
+        registrar_client.commit(&caller, &challenger_commitment, &label_len);
+        let params = registrar_client.params();
+        env.ledger()
+            .set_timestamp(15_000 + params.commit_min_age_secs);
+        let none_resolver: Option<Address> = None;
+        let attempt = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.register(
+                &caller,
+                &label,
+                &challenger,
+                &challenger_secret,
+                &none_resolver,
+            );
+        }));
+        assert!(attempt.is_err());
+        assert!(
+            commitment_exists(&env, &challenger_commitment),
+            "commitment must remain after failed registration"
+        );
+
+        let fresh_label = make_label(&env, "freshpolicy");
+        let fresh_secret = make_bytes(&env, b"fresh_secret");
+        let fresh_commitment = make_commitment(&env, &fresh_label, &owner, &fresh_secret);
+        let fresh_len = fresh_label.len();
+        registrar_client.commit(&caller, &fresh_commitment, &fresh_len);
+        env.ledger()
+            .set_timestamp(15_000 + 2 * params.commit_min_age_secs);
+        registrar_client.register(&caller, &fresh_label, &owner, &fresh_secret, &none_resolver);
+        assert!(
+            !commitment_exists(&env, &fresh_commitment),
+            "commitment must be removed after successful registration"
+        );
     }
 
     #[test]

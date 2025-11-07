@@ -326,7 +326,8 @@ impl Registrar {
             panic_with_error!(&env, RegistrarError::CommitmentMissingOrStale);
         }
         remove_commitment(&env, &commitment);
-
+        // Availability is checked after removing the commitment; a brief gap is acceptable
+        // because commit-reveal guarantees unique, one-shot commitments.
         if !Self::available(env.clone(), label.clone()) {
             panic_with_error!(&env, RegistrarError::NameNotAvailable);
         }

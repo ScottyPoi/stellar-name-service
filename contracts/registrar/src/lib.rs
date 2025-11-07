@@ -448,11 +448,11 @@ impl Registrar {
 
         let expires_at = registry_api::expires(&env, &registry, &namehash);
         match expires_at {
-            None => true,
             Some(ts) => {
                 let now = env.ledger().timestamp();
                 grace_expired(now, ts, params.grace_period_secs)
             }
+            None => false,
         }
     }
 
@@ -562,6 +562,12 @@ mod test {
                 .persistent()
                 .get(&MockRegistryKey::Expires(namehash.clone()))
                 .unwrap_or_else(|| panic!("expiry not set"))
+        }
+
+        pub fn clear_expiry(env: Env, namehash: BytesN<32>) {
+            env.storage()
+                .persistent()
+                .remove(&MockRegistryKey::Expires(namehash));
         }
     }
 
@@ -872,6 +878,36 @@ mod test {
         env.ledger()
             .set_timestamp(expires + registrar_client.params().grace_period_secs);
         assert!(!registrar_client.available(&label));
+    }
+
+    #[test]
+    fn unavailable_when_owner_missing_expiry() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(11_000);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let label = make_label(&env, "noexpiry");
+        let secret = make_bytes(&env, b"missing_expiry");
+
+        let namehash = register_name(
+            &env,
+            &registry_client,
+            &registrar_client,
+            &caller,
+            &label,
+            &owner,
+            &secret,
+            None,
+        );
+        assert!(!registrar_client.available(&label));
+
+        registry_client.clear_expiry(&namehash);
+        assert!(
+            !registrar_client.available(&label),
+            "ownership without expiry must remain unavailable"
+        );
     }
 
     #[test]

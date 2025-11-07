@@ -73,7 +73,9 @@ Listeners can index `commitment` or `namehash` to detect state transitions.
 | `NotOwner` | Renew attempted by someone other than the Registry owner. |
 | `InvalidLabel` | Empty/too short/too long label or malformed params. |
 | `CommitmentExists` | A commitment hash already exists in storage. |
-| `CommitmentMissingOrStale` | No matching commitment or outside the allowed age window. |
+| `CommitmentMissing` | No matching commitment found in storage. |
+| `CommitmentTooFresh` | Commitment exists but is not old enough to use. |
+| `CommitmentTooOld` | Commitment exists but is past the allowed age window. |
 | `NameNotAvailable` | Registering a label that is still registered or within its grace period. |
 
 Use `panic_with_error!(env, RegistrarError::...)` for consistent host-side behavior.

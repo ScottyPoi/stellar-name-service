@@ -41,7 +41,7 @@ Persistent data is pooled under byte prefixes:
 | `REG_TLD` | `Bytes` | Static TLD (e.g., `"stellar"`). |
 | `REG_PARM` | `RegistrarParams` | Policy struct. |
 | `REG_ADMN` | `Address` | Admin allowed to call `set_params`. |
-| `REG_COMM || commitment` | `u64` | Ledger timestamp for pending commitments. |
+| `REG_COMM || commitment` | `CommitmentInfo` | Struct with `timestamp: u64` and `label_len: u32` for pending commitments. |
 
 Helper functions in `lib.rs` centralize reading and writing these keys to avoid typos.
 

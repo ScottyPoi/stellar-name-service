@@ -94,12 +94,20 @@ fn write_admin(env: &Env, admin: &Address) {
     storage.set(&key, admin);
 }
 
-fn validate_label(env: &Env, label: &Bytes) {
-    let params = read_params(env);
-    let len = label.len();
+fn ensure_label_len_bounds(env: &Env, params: &RegistrarParams, len: u32) {
     if len < params.min_label_len || len > params.max_label_len {
         panic_with_error!(env, RegistrarError::InvalidLabel);
     }
+}
+
+fn validate_label(env: &Env, label: &Bytes) {
+    let params = read_params(env);
+    ensure_label_len_bounds(env, &params, label.len());
+}
+
+fn validate_label_len(env: &Env, len: u32) {
+    let params = read_params(env);
+    ensure_label_len_bounds(env, &params, len);
 }
 
 fn compute_commitment(env: &Env, label: &Bytes, owner: &Address, secret: &Bytes) -> BytesN<32> {
@@ -126,16 +134,16 @@ fn compute_namehash(env: &Env, label: &Bytes) -> BytesN<32> {
     fold_hash(env, &node, &label_hash)
 }
 
-fn commitment_timestamp(env: &Env, commitment: &BytesN<32>) -> Option<u64> {
+fn commitment_info(env: &Env, commitment: &BytesN<32>) -> Option<CommitmentInfo> {
     let storage = env.storage().persistent();
     let key = commitment_key(env, commitment);
     storage.get(&key)
 }
 
-fn store_commitment(env: &Env, commitment: &BytesN<32>, ts: u64) {
+fn store_commitment(env: &Env, commitment: &BytesN<32>, info: &CommitmentInfo) {
     let storage = env.storage().persistent();
     let key = commitment_key(env, commitment);
-    storage.set(&key, &ts);
+    storage.set(&key, info);
 }
 
 fn remove_commitment(env: &Env, commitment: &BytesN<32>) {
@@ -247,6 +255,7 @@ pub enum RegistrarError {
 pub struct EvtCommitMade {
     pub commitment: BytesN<32>,
     pub at: u64,
+    pub label_len: u32,
 }
 
 #[contracttype]
@@ -262,6 +271,13 @@ pub struct EvtNameRegistered {
 pub struct EvtNameRenewed {
     pub namehash: BytesN<32>,
     pub expires_at: u64,
+}
+
+#[contracttype]
+#[derive(Clone)]
+struct CommitmentInfo {
+    pub timestamp: u64,
+    pub label_len: u32,
 }
 
 #[contractimpl]
@@ -283,20 +299,30 @@ impl Registrar {
         write_params(&env, &params);
     }
 
-    /// Record commitment timestamp for commit–reveal.
-    pub fn commit(env: Env, caller: Address, commitment: BytesN<32>) {
+    /// Record commitment timestamp for commit–reveal. `label_len` allows early validation
+    /// without revealing the label itself on-chain.
+    pub fn commit(env: Env, caller: Address, commitment: BytesN<32>, label_len: u32) {
         ensure_initialized(&env);
         caller.require_auth();
+        validate_label_len(&env, label_len);
         let key = commitment_key(&env, &commitment);
         let storage = env.storage().persistent();
         if storage.has(&key) {
             panic_with_error!(&env, RegistrarError::CommitmentExists);
         }
         let ts = env.ledger().timestamp();
-        store_commitment(&env, &commitment, ts);
+        let info = CommitmentInfo {
+            timestamp: ts,
+            label_len,
+        };
+        store_commitment(&env, &commitment, &info);
         env.events().publish(
             (Symbol::new(&env, "commit_made"), commitment.clone()),
-            EvtCommitMade { commitment, at: ts },
+            EvtCommitMade {
+                commitment,
+                at: ts,
+                label_len,
+            },
         );
     }
 
@@ -319,11 +345,14 @@ impl Registrar {
         let now = env.ledger().timestamp();
         let commitment = compute_commitment(&env, &label, &owner, &secret);
 
-        let stored = commitment_timestamp(&env, &commitment)
+        let stored = commitment_info(&env, &commitment)
             .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::CommitmentMissingOrStale));
-        let age = now.saturating_sub(stored);
+        let age = now.saturating_sub(stored.timestamp);
         if age < params.commit_min_age_secs || age > params.commit_max_age_secs {
             panic_with_error!(&env, RegistrarError::CommitmentMissingOrStale);
+        }
+        if label.len() != stored.label_len {
+            panic_with_error!(&env, RegistrarError::InvalidLabel);
         }
         remove_commitment(&env, &commitment);
         // Availability is checked after removing the commitment; a brief gap is acceptable
@@ -372,9 +401,8 @@ impl Registrar {
         }
 
         registry_api::renew(&env, &registry, &namehash);
-        let expires_at = registry_api::expires(&env, &registry, &namehash).unwrap_or_else(|| {
-            panic_with_error!(&env, RegistrarError::ExpiryUnavailable)
-        });
+        let expires_at = registry_api::expires(&env, &registry, &namehash)
+            .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::ExpiryUnavailable));
 
         env.events().publish(
             (Symbol::new(&env, "name_renewed"), namehash.clone()),
@@ -566,7 +594,8 @@ mod test {
         resolver: Option<&Address>,
     ) -> BytesN<32> {
         let commitment = make_commitment(env, label, owner, secret);
-        registrar_client.commit(caller, &commitment);
+        let label_len = label.len();
+        registrar_client.commit(caller, &commitment, &label_len);
         let params = registrar_client.params();
         let now = env.ledger().timestamp();
         env.ledger().set_timestamp(now + params.commit_min_age_secs);
@@ -603,7 +632,8 @@ mod test {
         let secret = make_bytes(&env, b"secret");
 
         let commitment = make_commitment(&env, &label, &owner, &secret);
-        registrar_client.commit(&caller, &commitment);
+        let label_len = label.len();
+        registrar_client.commit(&caller, &commitment, &label_len);
 
         let params = registrar_client.params();
         env.ledger()
@@ -654,13 +684,14 @@ mod test {
         let label = make_label(&env, "fresh");
         let secret = make_bytes(&env, b"123");
         let commitment = make_commitment(&env, &label, &owner, &secret);
+        let label_len = label.len();
         let none_resolver: Option<Address> = None;
         let without_commit = catch_unwind(AssertUnwindSafe(|| {
             registrar_client.register(&caller, &label, &owner, &secret, &none_resolver);
         }));
         assert!(without_commit.is_err());
 
-        registrar_client.commit(&caller, &commitment);
+        registrar_client.commit(&caller, &commitment, &label_len);
         let too_fresh = catch_unwind(AssertUnwindSafe(|| {
             registrar_client.register(&caller, &label, &owner, &secret, &none_resolver);
         }));
@@ -688,7 +719,8 @@ mod test {
         assert!(registrar_client.available(&label));
 
         let commitment = make_commitment(&env, &label, &owner, &secret);
-        registrar_client.commit(&caller, &commitment);
+        let label_len = label.len();
+        registrar_client.commit(&caller, &commitment, &label_len);
         env.ledger()
             .set_timestamp(5_000 + registrar_client.params().commit_min_age_secs);
         let none_resolver: Option<Address> = None;
@@ -755,7 +787,8 @@ mod test {
         let new_owner = Address::generate(&env);
         let new_secret = make_bytes(&env, b"secret2");
         let commitment = make_commitment(&env, &label, &new_owner, &new_secret);
-        registrar_client.commit(&caller, &commitment);
+        let label_len = label.len();
+        registrar_client.commit(&caller, &commitment, &label_len);
         env.ledger()
             .set_timestamp(12_000 + registrar_client.params().commit_min_age_secs);
 

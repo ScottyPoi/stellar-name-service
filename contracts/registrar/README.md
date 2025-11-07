@@ -19,7 +19,7 @@ ownership/expiry storage to the Registry contract and—optionally—setting a R
 | Function | Description |
 | --- | --- |
 | `init(env, registry, tld, admin)` | One-time setup that records the Registry address, fixed TLD (e.g., `"stellar"`), default parameters, and admin. Re-invocation aborts with `AlreadyInitialized`. |
-| `commit(env, caller, commitment)` | Stores a SHA-256 commitment (`sha256(label || owner || secret)`) with the current ledger timestamp. Rejects duplicates via `CommitmentExists`. |
+| `commit(env, caller, commitment, label_len)` | Stores a SHA-256 commitment (`sha256(label || owner || secret)`) with the current ledger timestamp. Rejects duplicates via `CommitmentExists`. |
 | `register(env, caller, label, owner, secret, resolver)` | Verifies commitment age, checks availability, writes owner/expiry through Registry, optionally sets Resolver, emits `EvtNameRegistered`, and returns the namehash. |
 | `renew(env, caller, label)` | Validates ownership via Registry, calls `registry.renew`, and emits `EvtNameRenewed`. Extends expiry by the configured renewal extension. |
 | `available(env, label)` | Returns `true` if the label is unused or expired past the grace period; otherwise `false`. |

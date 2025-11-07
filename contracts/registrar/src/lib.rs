@@ -245,9 +245,11 @@ pub enum RegistrarError {
     NotOwner = 4,
     InvalidLabel = 5,
     CommitmentExists = 6,
-    CommitmentMissingOrStale = 7,
-    NameNotAvailable = 8,
-    ExpiryUnavailable = 9,
+    CommitmentMissing = 7,
+    CommitmentTooFresh = 8,
+    CommitmentTooOld = 9,
+    NameNotAvailable = 10,
+    ExpiryUnavailable = 11,
 }
 
 #[contracttype]
@@ -346,10 +348,13 @@ impl Registrar {
         let commitment = compute_commitment(&env, &label, &owner, &secret);
 
         let stored = commitment_info(&env, &commitment)
-            .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::CommitmentMissingOrStale));
+            .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::CommitmentMissing));
         let age = now.saturating_sub(stored.timestamp);
-        if age < params.commit_min_age_secs || age > params.commit_max_age_secs {
-            panic_with_error!(&env, RegistrarError::CommitmentMissingOrStale);
+        if age < params.commit_min_age_secs {
+            panic_with_error!(&env, RegistrarError::CommitmentTooFresh);
+        }
+        if age > params.commit_max_age_secs {
+            panic_with_error!(&env, RegistrarError::CommitmentTooOld);
         }
         if label.len() != stored.label_len {
             panic_with_error!(&env, RegistrarError::InvalidLabel);

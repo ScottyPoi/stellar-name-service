@@ -104,10 +104,11 @@ fn validate_label(env: &Env, label: &Bytes) {
     let params = read_params(env);
     let len = label.len();
     ensure_label_len_bounds(env, &params, len);
+    let last_idx = (len - 1) as usize;
     for (idx, b) in label.iter().enumerate() {
         match b {
             b'a'..=b'z' | b'0'..=b'9' => {}
-            b'-' if idx != 0 && idx as u32 != len - 1 => {}
+            b'-' if idx != 0 && idx != last_idx => {}
             _ => panic_with_error!(env, RegistrarError::InvalidLabel),
         };
     }

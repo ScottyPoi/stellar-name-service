@@ -104,11 +104,13 @@ fn validate_label(env: &Env, label: &Bytes) {
     let params = read_params(env);
     let len = label.len();
     ensure_label_len_bounds(env, &params, len);
-    for b in label.iter() {
+    let last_idx = (len - 1) as usize;
+    for (idx, b) in label.iter().enumerate() {
         match b {
-            b'a'..=b'z' | b'0'..=b'9' | b'-' => {}
+            b'a'..=b'z' | b'0'..=b'9' => {}
+            b'-' if idx != 0 && idx != last_idx => {}
             _ => panic_with_error!(env, RegistrarError::InvalidLabel),
-        }
+        };
     }
 }
 
@@ -1143,10 +1145,18 @@ mod test {
         let none_resolver: Option<Address> = None;
 
         let invalid_label = Bytes::from_slice(&env, b"Bad!");
-        let attempt = catch_unwind(AssertUnwindSafe(|| {
-            registrar_client.register(&caller, &invalid_label, &owner, &secret, &none_resolver);
-        }));
-        assert!(attempt.is_err(), "invalid characters must be rejected");
+        let leading_hyphen = Bytes::from_slice(&env, b"-lead");
+        let trailing_hyphen = Bytes::from_slice(&env, b"trail-");
+        for label in [&invalid_label, &leading_hyphen, &trailing_hyphen] {
+            let attempt = catch_unwind(AssertUnwindSafe(|| {
+                registrar_client.register(&caller, label, &owner, &secret, &none_resolver);
+            }));
+            assert!(
+                attempt.is_err(),
+                "invalid label {:?} must be rejected",
+                label
+            );
+        }
 
         let valid_label = make_label(&env, "abc-123");
         let commitment = make_commitment(&env, &valid_label, &owner, &secret);

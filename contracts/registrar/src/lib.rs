@@ -548,7 +548,7 @@ mod test {
         }
 
         pub fn renew(env: Env, namehash: BytesN<32>) {
-            let owner = env
+            let owner: Address = env
                 .storage()
                 .persistent()
                 .get(&MockRegistryKey::Owner(namehash.clone()))
@@ -612,17 +612,12 @@ mod test {
         }
 
         pub fn renew(env: Env, namehash: BytesN<32>) {
-            let owner = env
+            let owner: Address = env
                 .storage()
                 .persistent()
                 .get(&MockRegistryKey::Owner(namehash.clone()))
                 .unwrap_or_else(|| panic!("owner not set"));
             owner.require_auth();
-            let invoker = env.invoker();
-            assert_eq!(
-                owner, invoker,
-                "owner must temporarily match the registrar when renewing"
-            );
             let now = env.ledger().timestamp();
             let current = env
                 .storage()
@@ -702,8 +697,9 @@ mod test {
         namehash
     }
 
-    fn commitment_exists(env: &Env, commitment: &BytesN<32>) -> bool {
-        super::commitment_info(env, commitment).is_some()
+    fn commitment_exists(env: &Env, registrar_id: &Address, commitment: &BytesN<32>) -> bool {
+        env.as_contract(registrar_id, || super::commitment_info(env, commitment))
+            .is_some()
     }
 
     #[test]
@@ -1027,7 +1023,7 @@ mod test {
         }));
         assert!(attempt.is_err());
         assert!(
-            commitment_exists(&env, &challenger_commitment),
+            commitment_exists(&env, &registrar_id, &challenger_commitment),
             "commitment must remain after failed registration"
         );
 
@@ -1040,7 +1036,7 @@ mod test {
             .set_timestamp(15_000 + 2 * params.commit_min_age_secs);
         registrar_client.register(&caller, &fresh_label, &owner, &fresh_secret, &none_resolver);
         assert!(
-            !commitment_exists(&env, &fresh_commitment),
+            !commitment_exists(&env, &registrar_id, &fresh_commitment),
             "commitment must be removed after successful registration"
         );
     }

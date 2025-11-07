@@ -274,6 +274,7 @@ pub struct EvtNameRegistered {
     pub namehash: BytesN<32>,
     pub owner: Address,
     pub expires_at: u64,
+    pub ts: u64,
 }
 
 #[contracttype]
@@ -389,6 +390,7 @@ impl Registrar {
             now.checked_add(params.renew_extension_secs)
                 .unwrap_or(u64::MAX)
         });
+        let ts = env.ledger().timestamp();
 
         env.events().publish(
             (Symbol::new(&env, "name_registered"), namehash.clone()),
@@ -396,6 +398,7 @@ impl Registrar {
                 namehash: namehash.clone(),
                 owner: owner.clone(),
                 expires_at,
+                ts,
             },
         );
 
@@ -734,6 +737,7 @@ mod test {
         env.ledger()
             .set_timestamp(1_000 + params.commit_min_age_secs);
         let resolver_arg = Some(resolver.clone());
+        let expected_ts = env.ledger().timestamp();
         let namehash = registrar_client.register(&caller, &label, &owner, &secret, &resolver_arg);
         let events = env.events().all();
 
@@ -765,9 +769,35 @@ mod test {
             assert_eq!(evt.namehash, namehash);
             assert_eq!(evt.owner, owner);
             assert_eq!(evt.expires_at, expires);
+            assert_eq!(evt.ts, expected_ts);
             found = true;
         }
         assert!(found, "expected name_registered event");
+    }
+
+    #[test]
+    fn register_without_resolver_succeeds() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        env.ledger().set_timestamp(1_500);
+
+        let caller = Address::generate(&env);
+        let owner = Address::generate(&env);
+        let label = make_label(&env, "noresolver");
+        let secret = make_bytes(&env, b"none");
+
+        let commitment = make_commitment(&env, &label, &owner, &secret);
+        let label_len = label.len();
+        registrar_client.commit(&caller, &commitment, &label_len);
+        let params = registrar_client.params();
+        env.ledger()
+            .set_timestamp(1_500 + params.commit_min_age_secs);
+        let none_resolver: Option<Address> = None;
+        let namehash = registrar_client.register(&caller, &label, &owner, &secret, &none_resolver);
+
+        assert_eq!(registry_client.owner(&namehash), owner);
+        assert!(registry_client.resolver(&namehash).is_none());
     }
 
     #[test]

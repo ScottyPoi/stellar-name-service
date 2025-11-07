@@ -102,7 +102,14 @@ fn ensure_label_len_bounds(env: &Env, params: &RegistrarParams, len: u32) {
 
 fn validate_label(env: &Env, label: &Bytes) {
     let params = read_params(env);
-    ensure_label_len_bounds(env, &params, label.len());
+    let len = label.len();
+    ensure_label_len_bounds(env, &params, len);
+    for b in label.iter() {
+        match b {
+            b'a'..=b'z' | b'0'..=b'9' | b'-' => {}
+            _ => panic_with_error!(env, RegistrarError::InvalidLabel),
+        }
+    }
 }
 
 fn validate_label_len(env: &Env, len: u32) {
@@ -1097,6 +1104,36 @@ mod test {
             registrar_client.register(&caller, &empty_label, &owner, &secret, &none_resolver);
         }));
         assert!(attempt.is_err());
+    }
+
+    #[test]
+    fn label_character_validation() {
+        let (env, registry_id, registrar_id, _) = setup_env();
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+        env.ledger().set_timestamp(45_000);
+        let caller = Address::generate(&env);
+        let owner = caller.clone();
+        let secret = make_bytes(&env, b"validate");
+        let none_resolver: Option<Address> = None;
+
+        let invalid_label = Bytes::from_slice(&env, b"Bad!");
+        let attempt = catch_unwind(AssertUnwindSafe(|| {
+            registrar_client.register(&caller, &invalid_label, &owner, &secret, &none_resolver);
+        }));
+        assert!(attempt.is_err(), "invalid characters must be rejected");
+
+        let valid_label = make_label(&env, "abc-123");
+        let commitment = make_commitment(&env, &valid_label, &owner, &secret);
+        let label_len = valid_label.len();
+        registrar_client.commit(&caller, &commitment, &label_len);
+        let params = registrar_client.params();
+        env.ledger()
+            .set_timestamp(45_000 + params.commit_min_age_secs);
+        let namehash =
+            registrar_client.register(&caller, &valid_label, &owner, &secret, &none_resolver);
+
+        let registry_client = MockRegistryClient::new(&env, &registry_id);
+        assert_eq!(registry_client.owner(&namehash), owner);
     }
 
     #[test]

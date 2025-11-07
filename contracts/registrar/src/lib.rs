@@ -250,6 +250,7 @@ pub enum RegistrarError {
     CommitmentTooOld = 9,
     NameNotAvailable = 10,
     ExpiryUnavailable = 11,
+    InvalidParams = 12,
 }
 
 #[contracttype]
@@ -465,7 +466,7 @@ impl Registrar {
             || params.renew_extension_secs == 0
             || params.grace_period_secs == 0
         {
-            panic_with_error!(&env, RegistrarError::InvalidLabel);
+            panic_with_error!(&env, RegistrarError::InvalidParams);
         }
         write_params(&env, &params);
     }

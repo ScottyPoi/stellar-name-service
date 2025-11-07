@@ -71,12 +71,13 @@ Listeners can index `commitment` or `namehash` to detect state transitions.
 | `NotInitialized` | Any call requiring setup before `init`. |
 | `NotAdmin` | `set_params` caller differs from stored admin. |
 | `NotOwner` | Renew attempted by someone other than the Registry owner. |
-| `InvalidLabel` | Empty/too short/too long label or malformed params. |
+| `InvalidLabel` | Empty/too short/too long labels. |
 | `CommitmentExists` | A commitment hash already exists in storage. |
 | `CommitmentMissing` | No matching commitment found in storage. |
 | `CommitmentTooFresh` | Commitment exists but is not old enough to use. |
 | `CommitmentTooOld` | Commitment exists but is past the allowed age window. |
 | `NameNotAvailable` | Registering a label that is still registered or within its grace period. |
+| `InvalidParams` | Supplied registrar parameters violate the allowed bounds. |
 
 Use `panic_with_error!(env, RegistrarError::...)` for consistent host-side behavior.
 

@@ -11,6 +11,7 @@ const configSchema = z.object({
   databaseUrl: z.string().min(1, "DATABASE_URL is required"),
   registryId: z.string().min(1, "REGISTRY_ID is required"),
   resolverId: z.string().min(1, "RESOLVER_ID is required"),
+  registrarId: z.string().min(1, "REGISTRAR_ID is required"),
   port: z
     .string()
     .default("8787")
@@ -38,6 +39,7 @@ export function getConfig(): Config {
     databaseUrl: process.env.DATABASE_URL,
     registryId: process.env.REGISTRY_ID,
     resolverId: process.env.RESOLVER_ID,
+    registrarId: process.env.REGISTRAR_ID,
     port: process.env.PORT ?? undefined,
     network: process.env.NETWORK ?? undefined
   });

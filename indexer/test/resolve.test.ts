@@ -13,6 +13,7 @@ process.env.DATABASE_URL ??=
   "postgres://postgres:postgres@localhost:5432/stellar_ns_test";
 process.env.REGISTRY_ID ??= "CBREGISTRYTESTID";
 process.env.RESOLVER_ID ??= "CBRESOLVERTESTID";
+process.env.REGISTRAR_ID ??= "CBREGISTRARTESTID";
 process.env.NETWORK ??= "sandbox";
 
 const { runMigrations, getPool } = await import("../src/db.js");

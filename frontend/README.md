@@ -1,9 +1,9 @@
 # Stellar Name Service Frontend
 
-This package hosts the Next.js 14 app-router frontend for the Stellar Name Service demo.
+This package hosts the Next.js 16 app-router frontend for the Stellar Name Service demo.
 
 ## Requirements
-- Node.js 18+ (Next.js 14 LTS target)
+- Node.js 18+ (Next.js 16 LTS target)
 - npm 9+
 
 ## Setup

@@ -53,14 +53,27 @@ export interface NormalizedEvent {
 export type Mutation =
   | { kind: "ensureName"; namehash: Buffer; fqdn: string }
   | { kind: "setResolver"; namehash: Buffer; resolver: string }
-  | { kind: "setOwner"; namehash: Buffer; owner: string }
+  | {
+      kind: "setOwner";
+      namehash: Buffer;
+      owner: string;
+      source?: "registry" | "resolver";
+    }
   | { kind: "setExpiry"; namehash: Buffer; expiresAt: number }
   | { kind: "setRecord"; namehash: Buffer; key: Buffer; value: Buffer }
-  | { kind: "deleteRecord"; namehash: Buffer; key: Buffer };
+  | { kind: "deleteRecord"; namehash: Buffer; key: Buffer }
+  | {
+      kind: "registrarRegistration";
+      namehash: Buffer;
+      owner: string;
+      expiresAt: number;
+      txId: string;
+    }
+  | { kind: "registrarRenewal"; namehash: Buffer; expiresAt: number };
 
 
 export function extractMutations(event: NormalizedEvent): Mutation[] {
-  const { type, namehash, data } = event;
+  const { type, namehash, data, txId } = event;
   const mutations: Mutation[] = [];
 
   if (typeof data.fqdn === "string") {
@@ -84,19 +97,51 @@ export function extractMutations(event: NormalizedEvent): Mutation[] {
     }
     case "transfer": {
       const owner = coerceString(data.to ?? data.owner ?? data.new_owner, "owner");
-      mutations.push({ kind: "setOwner", namehash, owner });
+      mutations.push({ kind: "setOwner", namehash, owner, source: "registry" });
       break;
     }
     case "address_changed": {
       const address = coerceString(data.addr ?? data.address, "addr");
       const addrKey = Buffer.from("addr", "utf8");
-      mutations.push({ kind: "setOwner", namehash, owner: address });
+      mutations.push({
+        kind: "setOwner",
+        namehash,
+        owner: address,
+        source: "resolver"
+      });
       mutations.push({
         kind: "setRecord",
         namehash,
         key: addrKey,
         value: Buffer.from(address, "utf8")
       });
+      break;
+    }
+    case "name_registered": {
+      const owner = coerceString(data.owner, "owner");
+      const expiresAt = coerceNumber(
+        data.expires_at ?? data.expiresAt,
+        "expires_at"
+      );
+      mutations.push({
+        kind: "registrarRegistration",
+        namehash,
+        owner,
+        expiresAt,
+        txId
+      });
+      break;
+    }
+    case "name_renewed": {
+      const expiresAt = coerceNumber(
+        data.expires_at ?? data.expiresAt,
+        "expires_at"
+      );
+      mutations.push({ kind: "registrarRenewal", namehash, expiresAt });
+      break;
+    }
+    case "commit_made": {
+      // Registrar commitment events are not persisted.
       break;
     }
     case "text_changed": {

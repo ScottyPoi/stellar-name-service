@@ -206,4 +206,127 @@ describe("resolver API", () => {
     expect(response.statusCode).toBe(404);
     await app.close();
   });
+
+  it("ingests registrar hints without overriding registry state", async () => {
+    if (!dbAvailable) {
+      return;
+    }
+
+    const fqdn = "carol.stellar";
+    const namehash = fqdnToNamehash(fqdn);
+    const now = Math.floor(Date.now() / 1000);
+
+    const registrarOwner = "GBCAROLREGISTRAR0000000000000000000000000000000000000";
+    const canonicalOwner = "GBCAROLDIRECTOWNER00000000000000000000000000000000000";
+
+    await processNormalizedEvent({
+      contractId: process.env.REGISTRAR_ID!,
+      txId: "tx-registrar-1",
+      eventIndex: 0,
+      timestamp: now,
+      type: "name_registered",
+      namehash,
+      data: {
+        owner: registrarOwner,
+        expires_at: now + 1_000
+      }
+    });
+
+    const pool = getPool();
+    let row = await pool.query(
+      `
+        SELECT owner, expires_at, registration_tx, registered_via
+        FROM names
+        WHERE namehash = $1
+      `,
+      [namehash]
+    );
+
+    expect(row.rowCount).toBe(1);
+    expect(row.rows[0].owner).toBe(registrarOwner);
+    expect(Number.parseInt(row.rows[0].expires_at, 10)).toBe(now + 1_000);
+    expect(row.rows[0].registration_tx).toBe("tx-registrar-1");
+    expect(row.rows[0].registered_via).toBe("registrar");
+
+    await processNormalizedEvent({
+      contractId: process.env.REGISTRY_ID!,
+      txId: "tx-registry-1",
+      eventIndex: 0,
+      timestamp: now + 1,
+      type: "transfer",
+      namehash,
+      data: { to: canonicalOwner }
+    });
+
+    row = await pool.query(
+      `SELECT owner, expires_at FROM names WHERE namehash = $1`,
+      [namehash]
+    );
+
+    expect(row.rows[0].owner).toBe(canonicalOwner);
+
+    await processNormalizedEvent({
+      contractId: process.env.REGISTRAR_ID!,
+      txId: "tx-registrar-2",
+      eventIndex: 0,
+      timestamp: now + 2,
+      type: "name_registered",
+      namehash,
+      data: {
+        owner: "GBCAROLATTEMPT2OWNER000000000000000000000000000000000",
+        expires_at: now + 2_000
+      }
+    });
+
+    row = await pool.query(
+      `
+        SELECT owner, expires_at, registration_tx
+        FROM names
+        WHERE namehash = $1
+      `,
+      [namehash]
+    );
+
+    expect(row.rows[0].owner).toBe(canonicalOwner);
+    expect(Number.parseInt(row.rows[0].expires_at, 10)).toBe(now + 2_000);
+    expect(row.rows[0].registration_tx).toBe("tx-registrar-2");
+
+    await processNormalizedEvent({
+      contractId: process.env.REGISTRAR_ID!,
+      txId: "tx-registrar-3",
+      eventIndex: 0,
+      timestamp: now + 3,
+      type: "name_renewed",
+      namehash,
+      data: {
+        expires_at: now + 3_000
+      }
+    });
+
+    row = await pool.query(
+      `SELECT expires_at FROM names WHERE namehash = $1`,
+      [namehash]
+    );
+
+    expect(Number.parseInt(row.rows[0].expires_at, 10)).toBe(now + 3_000);
+
+    await processNormalizedEvent({
+      contractId: process.env.REGISTRAR_ID!,
+      txId: "tx-registrar-4",
+      eventIndex: 0,
+      timestamp: now + 4,
+      type: "name_renewed",
+      namehash,
+      data: {
+        expires_at: now + 500
+      }
+    });
+
+    row = await pool.query(
+      `SELECT expires_at FROM names WHERE namehash = $1`,
+      [namehash]
+    );
+
+    expect(Number.parseInt(row.rows[0].expires_at, 10)).toBe(now + 3_000);
+  });
 });

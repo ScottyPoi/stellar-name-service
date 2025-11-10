@@ -24,7 +24,7 @@ export async function startIndexer(): Promise<void> {
   logger.info(
     {
       rpcUrl: config.rpcUrl,
-      contracts: [config.registryId, config.resolverId],
+      contracts: [config.registryId, config.resolverId, config.registrarId],
       network: config.network
     },
     "starting indexer"
@@ -51,7 +51,7 @@ async function pollOnce(
   const filters: rpc.Api.EventFilter[] = [
     {
       type: "contract",
-      contractIds: [config.registryId, config.resolverId]
+      contractIds: [config.registryId, config.resolverId, config.registrarId]
     }
   ];
 
@@ -435,6 +435,16 @@ async function applyMutation(client: PoolClient, mutation: Mutation) {
       );
       break;
     }
+    case "registrarRegistration": {
+      await ensureName(client, mutation.namehash);
+      await applyRegistrarRegistration(client, mutation);
+      break;
+    }
+    case "registrarRenewal": {
+      await ensureName(client, mutation.namehash);
+      await applyRegistrarRenewal(client, mutation);
+      break;
+    }
     default:
       logger.warn({ mutation }, "unsupported mutation");
   }
@@ -461,6 +471,162 @@ async function ensureName(
       [namehash, fqdn]
     );
   }
+}
+
+type RegistrarRegistrationMutation = Extract<
+  Mutation,
+  { kind: "registrarRegistration" }
+>;
+
+type RegistrarRenewalMutation = Extract<
+  Mutation,
+  { kind: "registrarRenewal" }
+>;
+
+async function applyRegistrarRegistration(
+  client: PoolClient,
+  mutation: RegistrarRegistrationMutation
+) {
+  const result = await client.query(
+    `
+      SELECT owner, expires_at
+      FROM names
+      WHERE namehash = $1
+    `,
+    [mutation.namehash]
+  );
+
+  if (result.rowCount === 0) {
+    return;
+  }
+
+  const row = result.rows[0] as {
+    owner: string | null;
+    expires_at: string | number | null;
+  };
+
+  const updates: string[] = [];
+  const values: Array<Buffer | string | number> = [mutation.namehash];
+  let paramIndex = 2;
+  let mutated = false;
+
+  const ownerMatches = row.owner === mutation.owner;
+
+  if (row.owner === null) {
+    updates.push(`owner = $${paramIndex}`);
+    values.push(mutation.owner);
+    paramIndex += 1;
+    mutated = true;
+  } else if (!ownerMatches) {
+    logger.debug(
+      {
+        namehash: mutation.namehash.toString("hex"),
+        existingOwner: row.owner,
+        registrarOwner: mutation.owner
+      },
+      "skipping registrar owner hint due to conflict"
+    );
+  }
+
+  const currentExpiry =
+    row.expires_at === null
+      ? null
+      : Number.parseInt(row.expires_at.toString(), 10);
+
+  if (
+    currentExpiry === null ||
+    Number.isNaN(currentExpiry) ||
+    mutation.expiresAt > currentExpiry
+  ) {
+    updates.push(`expires_at = $${paramIndex}`);
+    values.push(mutation.expiresAt);
+    paramIndex += 1;
+    mutated = true;
+  } else if (mutation.expiresAt < currentExpiry) {
+    logger.debug(
+      {
+        namehash: mutation.namehash.toString("hex"),
+        existingExpiry: currentExpiry,
+        registrarExpiry: mutation.expiresAt
+      },
+      "skipping registrar expiry hint due to conflict"
+    );
+  }
+
+  const expiryMatches =
+    currentExpiry !== null &&
+    !Number.isNaN(currentExpiry) &&
+    mutation.expiresAt === currentExpiry;
+
+  const shouldPersistMetadata = mutated || (ownerMatches && expiryMatches);
+
+  if (!mutated && !shouldPersistMetadata) {
+    return;
+  }
+
+  if (shouldPersistMetadata) {
+    updates.push(`registration_tx = $${paramIndex}`);
+    values.push(mutation.txId);
+    paramIndex += 1;
+    updates.push(`registered_via = $${paramIndex}`);
+    values.push("registrar");
+  }
+
+  await client.query(
+    `
+      UPDATE names
+      SET ${updates.join(", ")}
+      WHERE namehash = $1
+    `,
+    values
+  );
+}
+
+async function applyRegistrarRenewal(
+  client: PoolClient,
+  mutation: RegistrarRenewalMutation
+) {
+  const result = await client.query(
+    `
+      SELECT expires_at
+      FROM names
+      WHERE namehash = $1
+    `,
+    [mutation.namehash]
+  );
+
+  if (result.rowCount === 0) {
+    return;
+  }
+
+  const row = result.rows[0] as { expires_at: string | number | null };
+  const currentExpiry =
+    row.expires_at === null
+      ? null
+      : Number.parseInt(row.expires_at.toString(), 10);
+
+  if (
+    currentExpiry !== null &&
+    !Number.isNaN(currentExpiry) &&
+    mutation.expiresAt <= currentExpiry
+  ) {
+    if (mutation.expiresAt < currentExpiry) {
+      logger.debug(
+        {
+          namehash: mutation.namehash.toString("hex"),
+          existingExpiry: currentExpiry,
+          registrarExpiry: mutation.expiresAt
+        },
+        "skipping registrar renewal hint due to conflict"
+      );
+    }
+    return;
+  }
+
+  await client.query(
+    `UPDATE names SET expires_at = $2 WHERE namehash = $1`,
+    [mutation.namehash, mutation.expiresAt]
+  );
 }
 
 async function loadCheckpoint(stream: string): Promise<string | null> {

@@ -3,8 +3,14 @@ CREATE TABLE IF NOT EXISTS names (
   fqdn TEXT NOT NULL,
   owner TEXT,
   resolver TEXT,
-  expires_at BIGINT
+  expires_at BIGINT,
+  registration_tx TEXT,
+  registered_via TEXT
 );
+
+ALTER TABLE names
+  ADD COLUMN IF NOT EXISTS registration_tx TEXT,
+  ADD COLUMN IF NOT EXISTS registered_via TEXT;
 
 CREATE TABLE IF NOT EXISTS records (
   namehash BYTEA NOT NULL,

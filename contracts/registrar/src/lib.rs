@@ -295,6 +295,11 @@ struct CommitmentInfo {
 
 #[contractimpl]
 impl Registrar {
+    /// Returns the contract version.
+    pub fn version(_env: Env) -> u32 {
+        1
+    }
+
     /// One-time initializer.
     pub fn init(env: Env, registry: Address, tld: Bytes, admin: Address) {
         let storage = env.storage().persistent();
@@ -702,6 +707,15 @@ mod test {
     fn commitment_exists(env: &Env, registrar_id: &Address, commitment: &BytesN<32>) -> bool {
         env.as_contract(registrar_id, || super::commitment_info(env, commitment))
             .is_some()
+    }
+
+    #[test]
+    fn version_returns_1() {
+        let env = Env::default();
+        let registrar_id = env.register(Registrar, ());
+        let registrar_client = RegistrarClient::new(&env, &registrar_id);
+
+        assert_eq!(registrar_client.version(), 1);
     }
 
     #[test]

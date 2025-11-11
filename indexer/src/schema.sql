@@ -8,10 +8,6 @@ CREATE TABLE IF NOT EXISTS names (
   registered_via TEXT
 );
 
-ALTER TABLE names
-  ADD COLUMN IF NOT EXISTS registration_tx TEXT,
-  ADD COLUMN IF NOT EXISTS registered_via TEXT;
-
 CREATE TABLE IF NOT EXISTS records (
   namehash BYTEA NOT NULL,
   key BYTEA NOT NULL,

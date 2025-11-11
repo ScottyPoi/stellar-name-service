@@ -27,7 +27,7 @@ export default function RootLayout({
             </div>
             {Object.entries(config).map(([key, val]) => {
               return (
-                <div className="text-right">
+                <div key={key} className="text-right">
                   <p className="text-xs uppercase tracking-wide text-slate-400">
                     {key}: {val}
                   </p>

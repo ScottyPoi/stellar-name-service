@@ -1,7 +1,14 @@
+import { existsSync } from "node:fs";
 import { config as loadEnv } from "dotenv";
 import { z } from "zod";
 
-loadEnv();
+const envFiles = [".env.local", ".env"];
+
+for (const path of envFiles) {
+  if (existsSync(path)) {
+    loadEnv({ path, override: true });
+  }
+}
 
 const configSchema = z.object({
   rpcUrl: z

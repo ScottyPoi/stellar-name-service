@@ -5,6 +5,7 @@ interface SearchBoxProps {
   loading?: boolean;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  suffix?: string;
 }
 
 export function SearchBox({
@@ -12,6 +13,7 @@ export function SearchBox({
   loading = false,
   onChange,
   onSubmit,
+  suffix = ".stellar",
 }: SearchBoxProps) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,14 +35,19 @@ export function SearchBox({
         Search for a Stellar name
       </label>
       <div className="flex flex-col gap-3 sm:flex-row">
-        <input
-          id="fqdn"
-          type="text"
-          value={value}
-          placeholder="Search for a Stellar name…"
-          onChange={(event) => onChange(event.target.value)}
-          className="flex-1 rounded-xl border border-slate-700/70 bg-slate-950/80 px-4 py-3 text-base text-slate-100 shadow focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-        />
+        <div className="flex flex-1 items-center rounded-xl border border-slate-700/70 bg-slate-950/80 pr-3 text-base shadow focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-500/40">
+          <input
+            id="fqdn"
+            type="text"
+            value={value}
+            placeholder="example"
+            onChange={(event) => onChange(event.target.value)}
+            className="flex-1 bg-transparent px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none"
+          />
+          <span className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            {suffix}
+          </span>
+        </div>
         <button
           type="submit"
           disabled={loading || !value.trim()}
@@ -50,7 +57,8 @@ export function SearchBox({
         </button>
       </div>
       <p className="text-xs text-slate-500">
-        Tip: try <span className="font-mono text-slate-200">example.stellar</span>
+        Tip: we automatically append{" "}
+        <span className="font-mono text-slate-200">{suffix}</span> to your search.
       </p>
     </form>
   );

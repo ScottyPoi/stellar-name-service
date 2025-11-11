@@ -13,6 +13,9 @@ import { ResultCard } from "@/components/resolver/ResultCard";
 
 type ResolverState = "idle" | "loading" | "success" | "not_found" | "error";
 
+const STELLAR_SUFFIX = ".stellar";
+const STELLAR_SUFFIX_REGEX = /\.stellar$/i;
+
 export default function Home() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -57,14 +60,31 @@ export default function Home() {
     };
   }, []);
 
+  const toNormalizedFqdn = useCallback(
+    (value: string) => {
+      const trimmed = value.trim().toLowerCase();
+      if (!trimmed) {
+        return "";
+      }
+      return trimmed.endsWith(STELLAR_SUFFIX)
+        ? trimmed
+        : `${trimmed}${STELLAR_SUFFIX}`;
+    },
+    [],
+  );
+
+  const toInputValue = useCallback((value: string) => {
+    return value.toLowerCase().replace(STELLAR_SUFFIX_REGEX, "");
+  }, []);
+
   const lookupName = useCallback(
     async (rawName?: string, options?: { updateUrl?: boolean }) => {
-      const normalized = (rawName ?? query).trim().toLowerCase();
+      const normalized = toNormalizedFqdn(rawName ?? query);
       if (!normalized) {
         return;
       }
       prefetchedNameRef.current = normalized;
-      setQuery(normalized);
+      setQuery(toInputValue(normalized));
 
       if (options?.updateUrl !== false) {
         const currentParams = new URLSearchParams(
@@ -113,11 +133,11 @@ export default function Home() {
         );
       }
     },
-    [query, router, searchParams],
+    [query, router, searchParams, toInputValue, toNormalizedFqdn],
   );
 
   useEffect(() => {
-    const paramName = searchParams?.get("name");
+    const paramName = searchParams?.get("name") ?? "";
     if (!paramName) {
       return;
     }
@@ -125,9 +145,9 @@ export default function Home() {
       return;
     }
     prefetchedNameRef.current = paramName;
-    setQuery(paramName);
+    setQuery(toInputValue(paramName));
     lookupName(paramName, { updateUrl: false });
-  }, [lookupName, searchParams]);
+  }, [lookupName, searchParams, toInputValue]);
 
   function renderResolverStatus() {
     if (resolverStatus === "loading") {
@@ -241,6 +261,7 @@ export default function Home() {
           loading={resolverStatus === "loading"}
           onChange={setQuery}
           onSubmit={() => lookupName()}
+          suffix={STELLAR_SUFFIX}
         />
 
         <div ref={resultRef} className="space-y-4">

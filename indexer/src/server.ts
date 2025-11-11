@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import fastifyEtag from "@fastify/etag";
+import fastifyCors from "@fastify/cors";
 import { getConfig } from "./config.js";
 import { runMigrations } from "./db.js";
 import { startIndexer } from "./ingest.js";
@@ -7,17 +8,15 @@ import { registerResolveRoutes } from "./routes/resolve.js";
 import { logger } from "./utils/logger.js";
 
 export async function createServer() {
+  const config = getConfig();
   const app = Fastify({ logger: false });
 
-  app.addHook("onRequest", async (_request, reply) => {
-    reply.header("Access-Control-Allow-Origin", "*");
-    reply.header("Access-Control-Allow-Methods", "GET,OPTIONS");
-    reply.header("Access-Control-Allow-Headers", "Content-Type");
-  });
-
-  app.options("*", async (_, reply) => {
-    reply.header("Access-Control-Max-Age", "600");
-    reply.status(204).send();
+  // Configure CORS based on environment
+  await app.register(fastifyCors, {
+    origin: config.nodeEnv === "development" ? "*" : false,
+    methods: ["GET", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+    maxAge: 600
   });
 
   app.get("/health", async () => ({ ok: true }));

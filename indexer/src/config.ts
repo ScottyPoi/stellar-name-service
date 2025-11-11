@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { config as loadEnv } from "dotenv";
 import { z } from "zod";
 
-const envFiles = [".env.local", ".env"];
+const envFiles = [".env",".env.local"];
 
 for (const path of envFiles) {
   if (existsSync(path)) {

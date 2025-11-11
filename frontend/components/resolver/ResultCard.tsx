@@ -25,9 +25,10 @@ export function ResultCard({ fqdn, data }: ResultCardProps) {
     (data.expires_at as string | undefined) ??
     null;
   const namehash = (data.namehash as string | undefined) ?? null;
-  const recordsEntries = Object.entries(
-    (data.records as Record<string, string>) ?? {},
-  );
+  const recordsEntries =
+    typeof data.records === "object" && data.records !== null
+      ? Object.entries(data.records as Record<string, string>)
+      : [];
 
   return (
     <div className="motion-safe:animate-fade-in rounded-2xl border border-slate-800/70 bg-slate-900/60 p-6 shadow-lg shadow-slate-950/30">

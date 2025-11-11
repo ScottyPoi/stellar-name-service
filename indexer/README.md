@@ -27,6 +27,7 @@ Subscribes to Registry/Resolver Soroban contracts, persists state in Postgres, a
    | `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/stellar_ns` | Postgres connection string                 |
    | `REGISTRY_ID`  | _(required)_                                 | Registry contract ID (`0x...` or StrKey)   |
    | `RESOLVER_ID`  | _(required)_                                 | Resolver contract ID                       |
+   | `REGISTRAR_ID` | _(required)_                                 | Registrar contract ID (commit/register)    |
    | `PORT`         | `8787`                                       | HTTP server port                           |
    | `NETWORK`      | `sandbox`                                    | `sandbox` or `testnet`                     |
 

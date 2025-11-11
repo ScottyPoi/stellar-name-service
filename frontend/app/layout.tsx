@@ -25,14 +25,15 @@ export default function RootLayout({
                 A simple interface to resolve .stellar names.
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-wide text-slate-400">
-                Network
-              </p>
-              <p className="text-base font-semibold text-emerald-200">
-                {config.network}
-              </p>
-            </div>
+            {Object.entries(config).map(([key, val]) => {
+              return (
+                <div key={key} className="text-right">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    {key}: {val}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </header>
         <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">

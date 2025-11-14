@@ -29,7 +29,8 @@ const configSchema = z.object({
       }
       return parsed;
     }),
-  network: z.enum(["sandbox", "testnet"]).default("sandbox")
+  network: z.enum(["sandbox", "testnet"]).default("sandbox"),
+  nodeEnv: z.enum(["development", "production", "test"]).default("development")
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -48,7 +49,8 @@ export function getConfig(): Config {
     resolverId: process.env.RESOLVER_ID,
     registrarId: process.env.REGISTRAR_ID,
     port: process.env.PORT ?? undefined,
-    network: process.env.NETWORK ?? undefined
+    network: process.env.NETWORK ?? undefined,
+    nodeEnv: process.env.NODE_ENV ?? undefined
   });
 
   cachedConfig = parsed;

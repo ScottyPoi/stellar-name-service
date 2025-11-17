@@ -91,7 +91,6 @@ pub struct Resolver;
 
 #[contractimpl]
 impl Resolver {
-
     pub fn version(_env: Env) -> u32 {
         1
     }

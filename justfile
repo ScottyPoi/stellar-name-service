@@ -51,6 +51,8 @@ NETWORK := "sandbox"
 # SOURCE_ACCOUNT is optional; set `SOURCE_ACCOUNT=<pubkey>` when you need a specific deployer.
 SOURCE_ACCOUNT := env('SOURCE_ACCOUNT', '')
 
+RPC_URL := "https://soroban-testnet.stellar.org"
+STELLAR_NETWORK_PASSPHRASE := "Test SDF Network ; September 2015"
 # Build contract to Wasm (output to target/wasm32v1-none/release/)
 build-contract crate:
     cd contracts/{{crate}} && soroban contract build
@@ -68,22 +70,25 @@ deploy crate:
         ${source_arg}
 
 # Invoke a method (example: just invoke registry version)
-invoke crate method filter='':
+invoke crate method +args:
     if [ -z "${CONTRACT_ID:-}" ]; then \
         echo "Set CONTRACT_ID to the deployed {{crate}} contract id before invoking."; \
         exit 1; \
     fi; \
-    if [ -n "{{filter}}" ]; then \
-        filter_args=({{filter}}); \
+    if [ -n "${SOROBAN_FILTER_LOGS:-}" ]; then \
+        filter_args=(--filter-logs "${SOROBAN_FILTER_LOGS}"); \
     else \
-        filter_args=(--filter-logs "${SOROBAN_FILTER_LOGS:-warn}"); \
+        filter_args=(--filter-logs warn); \
     fi; \
     soroban contract invoke \
         "${filter_args[@]}" \
         --id ${CONTRACT_ID} \
         --network {{NETWORK}} \
+        --rpc-url {{RPC_URL}} \
+        --network-passphrase "{{STELLAR_NETWORK_PASSPHRASE}}" \
+        --send yes \
         -- \
-        {{method}}
+        {{method}} {{args}}
 
 # Shortcut to reset local sandbox (optional)
 sandbox-reset:

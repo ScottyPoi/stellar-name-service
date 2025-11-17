@@ -17,7 +17,7 @@ identity = "default"
 # ---------------------------------------------------------
 [network.sandbox]
 rpc_url = "http://localhost:8000/soroban/rpc"
-# automatically started/stopped by `soroban network start/clean sandbox`
+# automatically started/stopped by `soroban container start/clean`
 
 # ---------------------------------------------------------
 # Stellar public testnet configuration

@@ -7,8 +7,10 @@ export interface AppConfig {
   network: "sandbox" | "testnet" | string;
 }
 
-function requiredEnv(name: string): string {
-  const value = process.env[name];
+function requirePublicEnv(
+  value: string | undefined,
+  name: string,
+): string {
   if (!value) {
     throw new Error(`Missing required env var: ${name}`);
   }
@@ -16,10 +18,25 @@ function requiredEnv(name: string): string {
 }
 
 export const config: AppConfig = {
-  indexerUrl: requiredEnv("NEXT_PUBLIC_INDEXER_URL"),
-  registryId: requiredEnv("NEXT_PUBLIC_REGISTRY_ID"),
-  resolverId: requiredEnv("NEXT_PUBLIC_RESOLVER_ID"),
-  registrarId: requiredEnv("NEXT_PUBLIC_REGISTRAR_ID"),
-  rpcUrl: requiredEnv("NEXT_PUBLIC_RPC_URL"),
+  indexerUrl: requirePublicEnv(
+    process.env.NEXT_PUBLIC_INDEXER_URL,
+    "NEXT_PUBLIC_INDEXER_URL",
+  ),
+  registryId: requirePublicEnv(
+    process.env.NEXT_PUBLIC_REGISTRY_ID,
+    "NEXT_PUBLIC_REGISTRY_ID",
+  ),
+  resolverId: requirePublicEnv(
+    process.env.NEXT_PUBLIC_RESOLVER_ID,
+    "NEXT_PUBLIC_RESOLVER_ID",
+  ),
+  registrarId: requirePublicEnv(
+    process.env.NEXT_PUBLIC_REGISTRAR_ID,
+    "NEXT_PUBLIC_REGISTRAR_ID",
+  ),
+  rpcUrl: requirePublicEnv(
+    process.env.NEXT_PUBLIC_RPC_URL,
+    "NEXT_PUBLIC_RPC_URL",
+  ),
   network: process.env.NEXT_PUBLIC_NETWORK ?? "sandbox",
 };

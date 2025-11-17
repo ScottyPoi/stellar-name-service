@@ -2,5 +2,6 @@
 members = [
   "contracts/registry",
   "contracts/resolver",
+  "contracts/registrar",
 ]
 resolver = "2"

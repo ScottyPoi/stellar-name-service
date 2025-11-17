@@ -12,6 +12,7 @@ type RpcServer = rpc.Server;
 const STREAM_KEY = "rpc:main";
 const EVENTS_LIMIT = 50;
 const INITIAL_LEDGER_WINDOW = 2000;
+const MIN_START_LEDGER = 7;
 
 export async function startIndexer(): Promise<void> {
   const config = getConfig();
@@ -113,7 +114,11 @@ async function inferStartingLedger(
 ): Promise<number | undefined> {
   try {
     const ledger = await server.getLatestLedger();
-    return Math.max(0, ledger.sequence - 200);
+    const earliest = Math.max(MIN_START_LEDGER, ledger.sequence - INITIAL_LEDGER_WINDOW);
+    if (earliest >= ledger.sequence) {
+      return Math.max(MIN_START_LEDGER, ledger.sequence - 10);
+    }
+    return earliest;
   } catch (error) {
     logger.warn({ err: error }, "unable to resolve latest ledger");
     return undefined;
@@ -351,7 +356,8 @@ function parseTimestamp(value?: string): number {
 export async function processNormalizedEvent(
   event: NormalizedEvent
 ): Promise<void> {
-  const mutations = extractMutations(event);
+  const config = getConfig();
+  const mutations = extractMutations(event, config.tld);
   if (mutations.length === 0) {
     logger.debug({ eventType: event.type }, "no mutations extracted");
   }

@@ -25,8 +25,10 @@ export function validateFqdn(fqdn: string): void {
 export function fqdnToNamehash(fqdn: string): Buffer {
   validateFqdn(fqdn);
   const labels = normalizeFqdn(fqdn).split(".");
+  // Process labels in reverse order (TLD first, then label) to match contract computation
+  const reversedLabels = labels.reverse();
   let node = Buffer.alloc(32, 0);
-  for (const label of labels) {
+  for (const label of reversedLabels) {
     const labelHash = createHash("sha256")
       .update(Buffer.from(label, "utf8"))
       .digest();

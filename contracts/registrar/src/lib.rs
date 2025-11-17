@@ -21,7 +21,7 @@ fn default_params() -> RegistrarParams {
     RegistrarParams {
         min_label_len: 1,
         max_label_len: 63,
-        commit_min_age_secs: 60,
+        commit_min_age_secs: 10,
         commit_max_age_secs: 86_400,
         renew_extension_secs: 31_536_000,
         grace_period_secs: 7_776_000,
@@ -277,6 +277,7 @@ pub struct EvtNameRegistered {
     pub owner: Address,
     pub expires_at: u64,
     pub ts: u64,
+    pub label: Bytes,
 }
 
 #[contracttype]
@@ -284,6 +285,16 @@ pub struct EvtNameRegistered {
 pub struct EvtNameRenewed {
     pub namehash: BytesN<32>,
     pub expires_at: u64,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct EvtCommitmentMissing {
+    pub commitment: BytesN<32>,
+    pub label: Bytes,
+    pub caller: Address,
+    pub owner: Address,
+    pub secret_len: u32,
 }
 
 #[contracttype]
@@ -363,8 +374,20 @@ impl Registrar {
         let now = env.ledger().timestamp();
         let commitment = compute_commitment(&env, &label, &owner, &secret);
 
-        let stored = commitment_info(&env, &commitment)
-            .unwrap_or_else(|| panic_with_error!(&env, RegistrarError::CommitmentMissing));
+        let stored = commitment_info(&env, &commitment).unwrap_or_else(|| {
+            let commitment_evt = commitment.clone();
+            env.events().publish(
+                (Symbol::new(&env, "commitment_missing"), commitment_evt.clone()),
+                EvtCommitmentMissing {
+                    commitment: commitment_evt,
+                    label: label.clone(),
+                    caller: caller.clone(),
+                    owner: owner.clone(),
+                    secret_len: secret.len(),
+                },
+            );
+            panic_with_error!(&env, RegistrarError::CommitmentMissing)
+        });
         let age = now.saturating_sub(stored.timestamp);
         if age < params.commit_min_age_secs {
             panic_with_error!(&env, RegistrarError::CommitmentTooFresh);
@@ -406,6 +429,7 @@ impl Registrar {
                 owner: owner.clone(),
                 expires_at,
                 ts,
+                label: label.clone(),
             },
         );
 
@@ -502,6 +526,7 @@ impl Registrar {
         ensure_initialized(&env);
         read_registry(&env)
     }
+
 }
 
 #[cfg(test)]

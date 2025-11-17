@@ -72,7 +72,7 @@ export type Mutation =
   | { kind: "registrarRenewal"; namehash: Buffer; expiresAt: number };
 
 
-export function extractMutations(event: NormalizedEvent): Mutation[] {
+export function extractMutations(event: NormalizedEvent, tld?: string): Mutation[] {
   const { type, namehash, data, txId } = event;
   const mutations: Mutation[] = [];
 
@@ -123,6 +123,18 @@ export function extractMutations(event: NormalizedEvent): Mutation[] {
         data.expires_at ?? data.expiresAt,
         "expires_at"
       );
+      
+      // Extract label from event data and construct FQDN
+      if (data.label !== undefined && tld) {
+        const label = coerceString(data.label, "label");
+        const fqdn = `${label}.${tld}`;
+        mutations.push({
+          kind: "ensureName",
+          namehash,
+          fqdn
+        });
+      }
+      
       mutations.push({
         kind: "registrarRegistration",
         namehash,

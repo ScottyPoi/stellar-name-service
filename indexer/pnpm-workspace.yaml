@@ -1,0 +1,3 @@
+onlyBuiltDependencies:
+  - '@stellar/stellar-sdk'
+  - esbuild

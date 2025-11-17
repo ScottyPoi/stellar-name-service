@@ -1,7 +1,14 @@
+import { existsSync } from "node:fs";
 import { config as loadEnv } from "dotenv";
 import { z } from "zod";
 
-loadEnv();
+const envFiles = [".env",".env.local"];
+
+for (const path of envFiles) {
+  if (existsSync(path)) {
+    loadEnv({ path, override: true });
+  }
+}
 
 const configSchema = z.object({
   rpcUrl: z
@@ -12,6 +19,7 @@ const configSchema = z.object({
   registryId: z.string().min(1, "REGISTRY_ID is required"),
   resolverId: z.string().min(1, "RESOLVER_ID is required"),
   registrarId: z.string().min(1, "REGISTRAR_ID is required"),
+  tld: z.string().default("stellar"),
   port: z
     .string()
     .default("8787")
@@ -40,6 +48,7 @@ export function getConfig(): Config {
     registryId: process.env.REGISTRY_ID,
     resolverId: process.env.RESOLVER_ID,
     registrarId: process.env.REGISTRAR_ID,
+    tld: process.env.TLD ?? undefined,
     port: process.env.PORT ?? undefined,
     network: process.env.NETWORK ?? undefined
   });

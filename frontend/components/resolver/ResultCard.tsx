@@ -20,10 +20,7 @@ export function ResultCard({ fqdn, data }: ResultCardProps) {
   const owner = (data.owner as string | undefined) ?? null;
   const resolver = (data.resolver as string | undefined) ?? null;
   const address = (data.address as string | undefined) ?? null;
-  const expiresAt =
-    (data.expiresAt as string | undefined) ??
-    (data.expires_at as string | undefined) ??
-    null;
+  const expiresAt = (data.expires_at as string | undefined) ?? null;
   const namehash = (data.namehash as string | undefined) ?? null;
   const recordsEntries =
     typeof data.records === "object" && data.records !== null

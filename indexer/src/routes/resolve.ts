@@ -14,7 +14,6 @@ type ResolveResponse = {
   owner: string | null;
   resolver: string | null;
   expires_at: string | null;
-  expiresAt: string | null;
   fqdn: string;
   namehash: string;
 };
@@ -97,7 +96,6 @@ export async function registerResolveRoutes(app: FastifyInstance) {
         owner: nameRow.owner ?? null,
         resolver: nameRow.resolver ?? null,
         expires_at: expiresIso,
-        expiresAt: expiresIso,
         fqdn: nameRow.fqdn ?? normalized,
         namehash: namehashHex
       };

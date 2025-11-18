@@ -135,7 +135,6 @@ describe("resolver API", () => {
       owner: string | null;
       resolver: string | null;
       expires_at: string | null;
-      expiresAt: string | null;
       fqdn: string;
       namehash: string;
     };
@@ -156,7 +155,6 @@ describe("resolver API", () => {
     );
     expect(payload.resolver).toBe("CBRESOLVERTESTID");
     expect(payload.expires_at).toBeNull();
-    expect(payload.expiresAt).toBeNull();
     expect(payload.fqdn).toBe(fqdn);
 
     await app.close();

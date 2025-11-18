@@ -79,11 +79,19 @@ log() {
   echo "$@" >&2
 }
 
+repo_root() {
+  # Resolve repository root relative to this script location to allow running from any cwd.
+  cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd
+}
+
 ensure_identity() {
-  if ! soroban keys ls | grep -qx "$IDENTITY"; then
-    echo "Creating identity \"$IDENTITY\"..."
-    soroban keys generate "$IDENTITY" >/dev/null
+  if soroban keys address "$IDENTITY" >/dev/null 2>&1; then
+    log "Identity \"$IDENTITY\" already exists; skipping creation."
+    return
   fi
+
+  echo "Creating identity \"$IDENTITY\"..."
+  soroban keys generate "$IDENTITY" >/dev/null
 }
 
 fund_identity() {
@@ -97,7 +105,7 @@ compute_address() {
     echo "$input"
     return
   fi
-  if soroban keys ls | grep -qx "$input"; then
+  if soroban keys address "$input" >/dev/null 2>&1; then
     soroban keys address "$input"
     return
   fi
@@ -145,6 +153,19 @@ deploy_contract() {
     exit 1
   fi
   echo "$id"
+}
+
+print_version() {
+  local contract_id="$1"
+  local label="$2"
+  log "Contract \"$label\" version:"
+  soroban contract invoke \
+    --id "$contract_id" \
+    --network "$NETWORK" \
+    --source "$IDENTITY" \
+    --send=yes \
+    -- \
+    version
 }
 
 init_resolver() {
@@ -198,23 +219,76 @@ main() {
 
   REGISTRY_ID=$(deploy_contract registry)
   log "  -> Registry ID: $REGISTRY_ID"
+  print_version "$REGISTRY_ID" "registry"
   RESOLVER_ID=$(deploy_contract resolver)
   log "  -> Resolver ID: $RESOLVER_ID"
   init_resolver "$RESOLVER_ID" "$REGISTRY_ID"
+  print_version "$RESOLVER_ID" "resolver"
 
   REGISTRAR_ID=$(deploy_contract registrar)
   log "  -> Registrar ID: $REGISTRAR_ID"
   init_registrar "$REGISTRAR_ID" "$REGISTRY_ID" "$ADMIN_ADDR"
+  print_version "$REGISTRAR_ID" "registrar"
+
+  update_envs
 
   cat <<EOF
 
 Deployment complete!
-  Registry : $REGISTRY_ID
-  Resolver : $RESOLVER_ID
-  Registrar: $REGISTRAR_ID
-Signer: $SIGNER_ADDR
-Admin : $ADMIN_ADDR
+  REGISTRY_ID=$REGISTRY_ID
+  RESOLVER_ID=$RESOLVER_ID
+  REGISTRAR_ID=$REGISTRAR_ID
+  Signer=$SIGNER_ADDR
+  Admin=$ADMIN_ADDR
+  Network=$NETWORK
 EOF
+}
+
+update_env_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  local tmp
+  tmp=$(mktemp)
+
+  if [[ -f "$file" ]]; then
+    awk -v k="$key" -v v="$value" '
+      BEGIN {updated=0}
+      $0 ~ "^" k "=" {print k "=" v; updated=1; next}
+      {print}
+      END {if (!updated) print k "=" v}
+    ' "$file" >"$tmp"
+  else
+    printf "%s=%s\n" "$key" "$value" >"$tmp"
+  fi
+
+  mv "$tmp" "$file"
+}
+
+update_envs() {
+  local root
+  root=$(repo_root)
+  local indexer_env="$root/indexer/.env"
+  local frontend_env="$root/frontend/.env.local"
+  local scripts_env="$root/scripts/.env"
+
+  update_env_value "$indexer_env" "REGISTRY_ID" "$REGISTRY_ID"
+  update_env_value "$indexer_env" "RESOLVER_ID" "$RESOLVER_ID"
+  update_env_value "$indexer_env" "REGISTRAR_ID" "$REGISTRAR_ID"
+
+  update_env_value "$frontend_env" "NEXT_PUBLIC_REGISTRY_ID" "$REGISTRY_ID"
+  update_env_value "$frontend_env" "NEXT_PUBLIC_RESOLVER_ID" "$RESOLVER_ID"
+  update_env_value "$frontend_env" "NEXT_PUBLIC_REGISTRAR_ID" "$REGISTRAR_ID"
+
+  update_env_value "$scripts_env" "ACCOUNT" "$SIGNER_ADDR"
+  update_env_value "$scripts_env" "REGISTRY_ID" "$REGISTRY_ID"
+  update_env_value "$scripts_env" "RESOLVER_ID" "$RESOLVER_ID"
+  update_env_value "$scripts_env" "REGISTRAR_ID" "$REGISTRAR_ID"
+
+  log "Updated env files with deployed contract IDs:"
+  log "  $indexer_env"
+  log "  $frontend_env"
+  log "  $scripts_env"
 }
 
 main "$@"

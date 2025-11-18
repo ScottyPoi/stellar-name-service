@@ -75,7 +75,9 @@ while [[ $# -gt 0 ]]; do
     --owner-addr=*)   OWNER_ADDR="${1#*=}"; shift;;
     --owner-addr)     OWNER_ADDR="$2"; shift 2;;
     --owner-skey=*)   OWNER_SKEY="${1#*=}"; shift;;
-  --owner-skey)     OWNER_SKEY="$2"; shift 2;;
+    --owner-skey)     OWNER_SKEY="$2"; shift 2;;
+    --network-passphrase=*) NETWORK_PASSPHRASE="${1#*=}"; shift;;
+    --network-passphrase) NETWORK_PASSPHRASE="$2"; shift 2;;
   *) echo "Unknown flag: $1"; exit 1;;
   esac
 done

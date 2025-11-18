@@ -11,6 +11,11 @@ const ADDR_KEY_HEX = Buffer.from("addr", "utf8").toString("hex");
 type ResolveResponse = {
   address: string | null;
   records: Record<string, string>;
+  owner: string | null;
+  resolver: string | null;
+  expires_at: string | null;
+  expiresAt: string | null;
+  fqdn: string;
   namehash: string;
 };
 
@@ -65,6 +70,23 @@ export async function registerResolveRoutes(app: FastifyInstance) {
         records[keyHex] = valueBuffer.toString("utf8");
       }
 
+      const nameRow = nameResult.rows[0] as {
+        fqdn: string;
+        owner: string | null;
+        resolver: string | null;
+        expires_at: string | number | null;
+      };
+
+      const expiresRaw = nameRow.expires_at;
+      const expiresSeconds =
+        expiresRaw === null
+          ? null
+          : Number.parseInt(expiresRaw.toString(), 10);
+      const expiresIso =
+        expiresSeconds === null || Number.isNaN(expiresSeconds)
+          ? null
+          : new Date(expiresSeconds * 1000).toISOString();
+
       const address = records[ADDR_KEY_HEX] ?? nameResult.rows[0].owner ?? null;
 
       reply.header("Cache-Control", "public, max-age=5");
@@ -72,6 +94,11 @@ export async function registerResolveRoutes(app: FastifyInstance) {
       const response: ResolveResponse = {
         address,
         records,
+        owner: nameRow.owner ?? null,
+        resolver: nameRow.resolver ?? null,
+        expires_at: expiresIso,
+        expiresAt: expiresIso,
+        fqdn: nameRow.fqdn ?? normalized,
         namehash: namehashHex
       };
 

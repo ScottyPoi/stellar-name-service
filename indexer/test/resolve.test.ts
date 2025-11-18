@@ -132,6 +132,11 @@ describe("resolver API", () => {
     const payload = response.json() as {
       address: string | null;
       records: Record<string, string>;
+      owner: string | null;
+      resolver: string | null;
+      expires_at: string | null;
+      expiresAt: string | null;
+      fqdn: string;
       namehash: string;
     };
 
@@ -146,6 +151,13 @@ describe("resolver API", () => {
     );
     expect(payload.records[profileKeyHex]).toBe("ipfs://cid");
     expect(payload.namehash).toBe(namehash.toString("hex"));
+    expect(payload.owner).toBe(
+      "GB6O3AGS2I2PTESTADDR0000000000000000000000000000000000"
+    );
+    expect(payload.resolver).toBe("CBRESOLVERTESTID");
+    expect(payload.expires_at).toBeNull();
+    expect(payload.expiresAt).toBeNull();
+    expect(payload.fqdn).toBe(fqdn);
 
     await app.close();
   });

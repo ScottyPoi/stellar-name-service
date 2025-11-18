@@ -58,9 +58,10 @@ pnpm start     # Run compiled server (uses .env via --env-file)
 ```
 
 - `GET /health` → `{ "ok": true }`
-- `GET /resolve/:name` → `{ address, records, namehash }`
+- `GET /resolve/:name` → `{ address, records, owner, resolver, expires_at, fqdn, namehash }`
   - `records` map keys are hex-encoded record keys.
   - `address` resolves to the `addr` record when present.
+  - `expires_at` is an ISO timestamp derived from the on-chain `expires_at` seconds value.
   - Responses include `Cache-Control: public, max-age=5` for lightweight caching.
 
 Set `DISABLE_INGEST=1` to run the API without the background worker (useful in tests).

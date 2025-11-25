@@ -23,9 +23,9 @@ export default function RootLayout({
           <Header />
           <main className="flex-1 py-10">
             <Container className="space-y-8">{children}</Container>
-            </main>
-            <Footer />
-          </div>
+          </main>
+          <Footer />
+        </div>
         </WalletProvider>
       </body>
     </html>

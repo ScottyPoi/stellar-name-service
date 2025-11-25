@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { StrKey } from "@stellar/stellar-sdk";
 import {
   getHealth,
   resolveName,
@@ -34,6 +35,7 @@ export default function Home() {
   const [addressSearchLoading, setAddressSearchLoading] = useState(false);
   const [addressSearchResults, setAddressSearchResults] = useState<NameInfo[]>([]);
   const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
+  const [addressValidationError, setAddressValidationError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const resultRef = useRef<HTMLDivElement>(null);
@@ -156,14 +158,36 @@ export default function Home() {
     lookupName(paramName, { updateUrl: false });
   }, [lookupName, searchParams, toInputValue]);
 
+  const validateStellarAddress = useCallback((address: string): string | null => {
+    const trimmed = address.trim();
+    if (!trimmed) {
+      return null; // Empty is allowed (will be handled by disabled button)
+    }
+    if (!StrKey.isValidEd25519PublicKey(trimmed)) {
+      return "Invalid Stellar address format. Address must start with 'G' and be 56 characters long.";
+    }
+    return null;
+  }, []);
+
   const searchByAddress = useCallback(async (address: string) => {
     const trimmed = address.trim();
     if (!trimmed) {
       setAddressSearchResults([]);
       setAddressSearchError(null);
+      setAddressValidationError(null);
       return;
     }
 
+    // Validate address format before making API call
+    const validationError = validateStellarAddress(trimmed);
+    if (validationError) {
+      setAddressValidationError(validationError);
+      setAddressSearchError(null);
+      setAddressSearchResults([]);
+      return;
+    }
+
+    setAddressValidationError(null);
     setAddressSearchLoading(true);
     setAddressSearchError(null);
     setAddressSearchResults([]);
@@ -178,7 +202,7 @@ export default function Home() {
       );
       setAddressSearchLoading(false);
     }
-  }, []);
+  }, [validateStellarAddress]);
 
   function renderResolverStatus() {
     if (resolverStatus === "loading") {
@@ -311,17 +335,61 @@ export default function Home() {
             Stellar Address
           </label>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              id="address"
-              type="text"
-              value={addressQuery}
-              onChange={(e) => setAddressQuery(e.target.value)}
-              placeholder="G..."
-              className="flex-1 rounded-xl border border-slate-700/70 bg-slate-950/80 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-            />
+            <div className="flex-1">
+              <input
+                id="address"
+                type="text"
+                value={addressQuery}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setAddressQuery(value);
+                  const trimmed = value.trim();
+                  
+                  // Clear error if input becomes valid
+                  if (trimmed && StrKey.isValidEd25519PublicKey(trimmed)) {
+                    setAddressValidationError(null);
+                    return;
+                  }
+                  
+                  // Show early feedback for obvious errors (not just incomplete)
+                  if (trimmed.length >= 2 && !trimmed.startsWith("G")) {
+                    setAddressValidationError("Stellar address must start with 'G'");
+                  } else if (trimmed.length > 56) {
+                    setAddressValidationError("Stellar address must be 56 characters long");
+                  } else if (addressValidationError && trimmed.length < 56) {
+                    // Clear error if user is still typing (address might be incomplete)
+                    setAddressValidationError(null);
+                  }
+                }}
+                onBlur={(e) => {
+                  // Validate on blur to show error if user leaves invalid input
+                  const trimmed = e.target.value.trim();
+                  if (trimmed) {
+                    const error = validateStellarAddress(trimmed);
+                    setAddressValidationError(error);
+                  } else {
+                    setAddressValidationError(null);
+                  }
+                }}
+                placeholder="G..."
+                className={`w-full rounded-xl border bg-slate-950/80 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 ${
+                  addressValidationError
+                    ? "border-red-500 focus:border-red-500 focus:ring-red-500/40"
+                    : "border-slate-700/70 focus:border-sky-500 focus:ring-sky-500/40"
+                }`}
+              />
+              {addressValidationError && (
+                <p className="mt-1 text-sm text-red-400">{addressValidationError}</p>
+              )}
+            </div>
             <button
               type="submit"
-              disabled={addressSearchLoading || !addressQuery.trim()}
+              disabled={
+                addressSearchLoading ||
+                !addressQuery.trim() ||
+                !!addressValidationError ||
+                !StrKey.isValidEd25519PublicKey(addressQuery.trim())
+              }
               className="rounded-xl bg-sky-500 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-600"
             >
               {addressSearchLoading ? "Searching..." : "Search"}

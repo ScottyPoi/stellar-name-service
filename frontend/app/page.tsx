@@ -14,6 +14,7 @@ import { SearchBox } from "@/components/resolver/SearchBox";
 import { StatusBanner } from "@/components/resolver/StatusBanner";
 import { ResultCard } from "@/components/resolver/ResultCard";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
+import { RegisteredNamesList } from "@/components/wallet/RegisteredNamesList";
 
 type ResolverState = "idle" | "loading" | "success" | "not_found" | "error";
 
@@ -312,6 +313,8 @@ export default function Home() {
       <div className="space-y-4">
         <ConnectWalletButton />
       </div>
+
+      <RegisteredNamesList />
       
       <div className="space-y-6">
         <div className="space-y-2 text-center">

@@ -23,6 +23,25 @@ export function createRenewOperation(
 }
 
 /**
+ * Creates a contract invocation operation for transferring ownership of a name
+ * via the registry contract.
+ */
+export function createTransferOperation(
+  registryContractId: string,
+  namehashHex: string,
+  newOwnerAccount: string
+): xdr.Operation<Operation.InvokeHostFunction> {
+  const contract = new Contract(registryContractId);
+  const namehashBytes = Buffer.from(namehashHex, "hex");
+  if (namehashBytes.length !== 32) {
+    throw new Error("Invalid namehash length; expected 32 bytes");
+  }
+  const namehashVal = nativeToScVal(new Uint8Array(namehashBytes));
+  const newOwner = Address.fromString(newOwnerAccount);
+  return contract.call("transfer", namehashVal, newOwner.toScVal());
+}
+
+/**
  * Gets the RPC URL for the current network
  */
 export function getRpcUrl(network: string | null): string {

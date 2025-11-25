@@ -10,7 +10,6 @@ import {
 import { SearchBox } from "@/components/resolver/SearchBox";
 import { StatusBanner } from "@/components/resolver/StatusBanner";
 import { ResultCard } from "@/components/resolver/ResultCard";
-import { SendPaymentButton } from "@/components/wallet/SendPaymentButton";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 
 type ResolverState = "idle" | "loading" | "success" | "not_found" | "error";

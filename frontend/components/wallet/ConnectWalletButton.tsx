@@ -18,33 +18,29 @@ export const ConnectWalletButton: React.FC = () => {
   const [namesLoading, setNamesLoading] = useState(false);
   const [namesError, setNamesError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchNames = React.useCallback(async () => {
     if (!publicKey) {
       setNames([]);
       setNamesError(null);
       return;
     }
 
-    let isActive = true;
     setNamesLoading(true);
     setNamesError(null);
 
-    getNamesByOwner(publicKey)
-      .then((response) => {
-        if (!isActive) return;
-        setNames(response.names);
-        setNamesLoading(false);
-      })
-      .catch((err) => {
-        if (!isActive) return;
-        setNamesError(err instanceof Error ? err.message : "Failed to fetch names");
-        setNamesLoading(false);
-      });
-
-    return () => {
-      isActive = false;
-    };
+    try {
+      const response = await getNamesByOwner(publicKey);
+      setNames(response.names);
+      setNamesLoading(false);
+    } catch (err) {
+      setNamesError(err instanceof Error ? err.message : "Failed to fetch names");
+      setNamesLoading(false);
+    }
   }, [publicKey]);
+
+  useEffect(() => {
+    fetchNames();
+  }, [fetchNames]);
 
   if (!isInstalled) {
     return (
@@ -83,7 +79,17 @@ export const ConnectWalletButton: React.FC = () => {
         )}
         
         <div className="pt-2 border-t">
-          <div className="text-xs text-gray-500 mb-2">Registered Names</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs text-gray-500">Registered Names</div>
+            <button
+              onClick={fetchNames}
+              disabled={namesLoading || !publicKey}
+              className="px-2 py-1 text-xs border rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Refresh names list"
+            >
+              {namesLoading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
           {namesLoading ? (
             <div className="text-xs text-gray-400">Loading names...</div>
           ) : namesError ? (

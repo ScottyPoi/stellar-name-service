@@ -13,10 +13,13 @@ function formatDate(value?: string | null) {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   });
 }
 

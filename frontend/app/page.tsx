@@ -15,6 +15,7 @@ import { StatusBanner } from "@/components/resolver/StatusBanner";
 import { ResultCard } from "@/components/resolver/ResultCard";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 import { RegisteredNamesList } from "@/components/wallet/RegisteredNamesList";
+import { RegisterNameCard } from "@/components/wallet/RegisterNameCard";
 
 type ResolverState = "idle" | "loading" | "success" | "not_found" | "error";
 
@@ -37,6 +38,7 @@ export default function Home() {
   const [addressSearchResults, setAddressSearchResults] = useState<NameInfo[]>([]);
   const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
   const [addressValidationError, setAddressValidationError] = useState<string | null>(null);
+  const [namesRefreshToken, setNamesRefreshToken] = useState(0);
   const router = useRouter();
   const searchParams = useSearchParams();
   const resultRef = useRef<HTMLDivElement>(null);
@@ -310,11 +312,14 @@ export default function Home() {
           Indexer.
         </p>
       </div>
-      <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
         <ConnectWalletButton />
+        <RegisterNameCard
+          onRegistered={() => setNamesRefreshToken((val) => val + 1)}
+        />
       </div>
 
-      <RegisteredNamesList />
+      <RegisteredNamesList refreshToken={namesRefreshToken} />
       
       <div className="space-y-6">
         <div className="space-y-2 text-center">

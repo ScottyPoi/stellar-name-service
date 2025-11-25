@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   getHealth,
   resolveName,
+  getNamesByOwner,
   type HealthResponse,
+  type NameInfo,
 } from "@/lib/indexerClient";
 import { SearchBox } from "@/components/resolver/SearchBox";
 import { StatusBanner } from "@/components/resolver/StatusBanner";
@@ -28,6 +30,10 @@ export default function Home() {
     null,
   );
   const [resolvedName, setResolvedName] = useState<string | null>(null);
+  const [addressQuery, setAddressQuery] = useState("");
+  const [addressSearchLoading, setAddressSearchLoading] = useState(false);
+  const [addressSearchResults, setAddressSearchResults] = useState<NameInfo[]>([]);
+  const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const resultRef = useRef<HTMLDivElement>(null);
@@ -150,6 +156,30 @@ export default function Home() {
     lookupName(paramName, { updateUrl: false });
   }, [lookupName, searchParams, toInputValue]);
 
+  const searchByAddress = useCallback(async (address: string) => {
+    const trimmed = address.trim();
+    if (!trimmed) {
+      setAddressSearchResults([]);
+      setAddressSearchError(null);
+      return;
+    }
+
+    setAddressSearchLoading(true);
+    setAddressSearchError(null);
+    setAddressSearchResults([]);
+
+    try {
+      const response = await getNamesByOwner(trimmed);
+      setAddressSearchResults(response.names);
+      setAddressSearchLoading(false);
+    } catch (error) {
+      setAddressSearchError(
+        error instanceof Error ? error.message : "Failed to search names"
+      );
+      setAddressSearchLoading(false);
+    }
+  }, []);
+
   function renderResolverStatus() {
     if (resolverStatus === "loading") {
       return (
@@ -258,7 +288,102 @@ export default function Home() {
       <div className="space-y-4">
         <ConnectWalletButton />
       </div>
+      
       <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <h2 className="text-xl font-semibold text-white">Search by Address</h2>
+          <p className="text-sm text-slate-400">
+            Find all names registered to a specific Stellar address
+          </p>
+        </div>
+        
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            searchByAddress(addressQuery);
+          }}
+          className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-6 shadow-inner"
+        >
+          <label
+            htmlFor="address"
+            className="text-sm font-medium uppercase tracking-wide text-slate-400"
+          >
+            Stellar Address
+          </label>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              id="address"
+              type="text"
+              value={addressQuery}
+              onChange={(e) => setAddressQuery(e.target.value)}
+              placeholder="G..."
+              className="flex-1 rounded-xl border border-slate-700/70 bg-slate-950/80 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+            />
+            <button
+              type="submit"
+              disabled={addressSearchLoading || !addressQuery.trim()}
+              className="rounded-xl bg-sky-500 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-600"
+            >
+              {addressSearchLoading ? "Searching..." : "Search"}
+            </button>
+          </div>
+        </form>
+
+        {addressSearchError && (
+          <div className="rounded-xl border border-red-800/60 bg-red-900/20 p-4">
+            <p className="text-sm text-red-400">{addressSearchError}</p>
+          </div>
+        )}
+
+        {addressSearchResults.length > 0 && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-800/60 bg-slate-900/40 p-6 shadow-inner">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Names Registered to {addressQuery}
+              </h3>
+              <div className="space-y-2">
+                {addressSearchResults.map((name) => (
+                  <div
+                    key={name.namehash}
+                    className="p-4 bg-slate-950/80 rounded-xl border border-slate-700/70"
+                  >
+                    <div className="font-semibold text-white text-base">
+                      {name.fqdn}
+                    </div>
+                    {name.expires_at && (
+                      <div className="text-sm text-slate-400 mt-1">
+                        Expires: {new Date(name.expires_at).toLocaleDateString()}
+                      </div>
+                    )}
+                    {name.resolver && (
+                      <div className="text-xs text-slate-500 mt-1 font-mono">
+                        Resolver: {name.resolver}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!addressSearchLoading && addressQuery.trim() && addressSearchResults.length === 0 && !addressSearchError && (
+          <div className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-4">
+            <p className="text-sm text-slate-400">
+              No names found for address {addressQuery}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <h2 className="text-xl font-semibold text-white">Resolve Name</h2>
+          <p className="text-sm text-slate-400">
+            Look up a .stellar name to view its details
+          </p>
+        </div>
+        
         <SearchBox
           value={query}
           loading={resolverStatus === "loading"}

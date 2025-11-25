@@ -267,7 +267,6 @@ export function RegisterNameCard({ onRegistered }: RegisterNameCardProps) {
     resetSteps,
     resolver,
     sendOperation,
-    setSteps,
   ]);
 
   const buttonDisabled =

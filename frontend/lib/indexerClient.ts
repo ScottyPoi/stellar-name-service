@@ -43,3 +43,32 @@ export async function resolveName(
 
   return { status: res.status, data };
 }
+
+export interface NameInfo {
+  fqdn: string;
+  owner: string | null;
+  resolver: string | null;
+  expires_at: string | null;
+  namehash: string;
+}
+
+export interface NamesByOwnerResponse {
+  names: NameInfo[];
+}
+
+export async function getNamesByOwner(
+  owner: string,
+): Promise<NamesByOwnerResponse> {
+  const url = `${config.indexerUrl}/names/${encodeURIComponent(owner)}`;
+  const res = await fetch(url, { cache: "no-store" });
+  
+  if (!res.ok) {
+    if (res.status === 404) {
+      return { names: [] };
+    }
+    throw new Error(`Failed to fetch names: ${res.statusText}`);
+  }
+
+  const data = await res.json() as NamesByOwnerResponse;
+  return data;
+}

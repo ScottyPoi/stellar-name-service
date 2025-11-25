@@ -357,7 +357,7 @@ export async function processNormalizedEvent(
   event: NormalizedEvent
 ): Promise<void> {
   const config = getConfig();
-  const mutations = extractMutations(event, config.tld);
+  const mutations = extractMutations(event, config.tld, config.registryId);
   if (mutations.length === 0) {
     logger.debug({ eventType: event.type }, "no mutations extracted");
   }
@@ -393,33 +393,58 @@ export async function processNormalizedEvent(
 }
 
 async function applyMutation(client: PoolClient, mutation: Mutation) {
+  const config = getConfig();
   switch (mutation.kind) {
     case "ensureName": {
-      await ensureName(client, mutation.namehash, mutation.fqdn);
+      await ensureName(client, mutation.namehash, mutation.fqdn, mutation.contractId === config.registryId ? mutation.contractId : undefined);
       break;
     }
     case "setResolver": {
-      await ensureName(client, mutation.namehash);
-      await client.query(
-        `UPDATE names SET resolver = $2 WHERE namehash = $1`,
-        [mutation.namehash, mutation.resolver]
-      );
+      const isRegistryEvent = mutation.contractId === config.registryId;
+      await ensureName(client, mutation.namehash, undefined, isRegistryEvent ? mutation.contractId : undefined);
+      if (isRegistryEvent) {
+        await client.query(
+          `UPDATE names SET resolver = $2, registry_contract_id = $3 WHERE namehash = $1`,
+          [mutation.namehash, mutation.resolver, mutation.contractId]
+        );
+      } else {
+        await client.query(
+          `UPDATE names SET resolver = $2 WHERE namehash = $1`,
+          [mutation.namehash, mutation.resolver]
+        );
+      }
       break;
     }
     case "setOwner": {
-      await ensureName(client, mutation.namehash);
-      await client.query(
-        `UPDATE names SET owner = $2 WHERE namehash = $1`,
-        [mutation.namehash, mutation.owner]
-      );
+      await ensureName(client, mutation.namehash, undefined, mutation.contractId === config.registryId ? mutation.contractId : undefined);
+      // If this is a registry transfer event, update the registry_contract_id
+      if (mutation.source === "registry" && mutation.contractId === config.registryId) {
+        await client.query(
+          `UPDATE names SET owner = $2, registry_contract_id = $3 WHERE namehash = $1`,
+          [mutation.namehash, mutation.owner, mutation.contractId]
+        );
+      } else {
+        await client.query(
+          `UPDATE names SET owner = $2 WHERE namehash = $1`,
+          [mutation.namehash, mutation.owner]
+        );
+      }
       break;
     }
     case "setExpiry": {
-      await ensureName(client, mutation.namehash);
-      await client.query(
-        `UPDATE names SET expires_at = $2 WHERE namehash = $1`,
-        [mutation.namehash, mutation.expiresAt]
-      );
+      const isRegistryEvent = mutation.contractId === config.registryId;
+      await ensureName(client, mutation.namehash, undefined, isRegistryEvent ? mutation.contractId : undefined);
+      if (isRegistryEvent) {
+        await client.query(
+          `UPDATE names SET expires_at = $2, registry_contract_id = $3 WHERE namehash = $1`,
+          [mutation.namehash, mutation.expiresAt, mutation.contractId]
+        );
+      } else {
+        await client.query(
+          `UPDATE names SET expires_at = $2 WHERE namehash = $1`,
+          [mutation.namehash, mutation.expiresAt]
+        );
+      }
       break;
     }
     case "setRecord": {
@@ -442,7 +467,9 @@ async function applyMutation(client: PoolClient, mutation: Mutation) {
       break;
     }
     case "registrarRegistration": {
-      await ensureName(client, mutation.namehash);
+      // When a name is registered via registrar, the registry contract ID should be set
+      // from the config since we're tracking events from the configured registry
+      await ensureName(client, mutation.namehash, undefined, config.registryId);
       await applyRegistrarRegistration(client, mutation);
       break;
     }
@@ -459,17 +486,29 @@ async function applyMutation(client: PoolClient, mutation: Mutation) {
 async function ensureName(
   client: PoolClient,
   namehash: Buffer,
-  fqdn?: string
+  fqdn?: string,
+  registryContractId?: string
 ): Promise<void> {
   const placeholder = `[unknown::${namehash.toString("hex")}]`;
-  await client.query(
-    `
-      INSERT INTO names (namehash, fqdn)
-      VALUES ($1, $2)
-      ON CONFLICT (namehash) DO NOTHING
-    `,
-    [namehash, fqdn ?? placeholder]
-  );
+  if (registryContractId) {
+    await client.query(
+      `
+        INSERT INTO names (namehash, fqdn, registry_contract_id)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (namehash) DO UPDATE SET registry_contract_id = EXCLUDED.registry_contract_id
+      `,
+      [namehash, fqdn ?? placeholder, registryContractId]
+    );
+  } else {
+    await client.query(
+      `
+        INSERT INTO names (namehash, fqdn)
+        VALUES ($1, $2)
+        ON CONFLICT (namehash) DO NOTHING
+      `,
+      [namehash, fqdn ?? placeholder]
+    );
+  }
 
   if (fqdn) {
     await client.query(

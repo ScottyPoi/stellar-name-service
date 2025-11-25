@@ -51,53 +51,57 @@ export interface NormalizedEvent {
 }
 
 export type Mutation =
-  | { kind: "ensureName"; namehash: Buffer; fqdn: string }
-  | { kind: "setResolver"; namehash: Buffer; resolver: string }
+  | { kind: "ensureName"; namehash: Buffer; fqdn: string; contractId?: string }
+  | { kind: "setResolver"; namehash: Buffer; resolver: string; contractId?: string }
   | {
       kind: "setOwner";
       namehash: Buffer;
       owner: string;
       source?: "registry" | "resolver";
+      contractId?: string;
     }
-  | { kind: "setExpiry"; namehash: Buffer; expiresAt: number }
-  | { kind: "setRecord"; namehash: Buffer; key: Buffer; value: Buffer }
-  | { kind: "deleteRecord"; namehash: Buffer; key: Buffer }
+  | { kind: "setExpiry"; namehash: Buffer; expiresAt: number; contractId?: string }
+  | { kind: "setRecord"; namehash: Buffer; key: Buffer; value: Buffer; contractId?: string }
+  | { kind: "deleteRecord"; namehash: Buffer; key: Buffer; contractId?: string }
   | {
       kind: "registrarRegistration";
       namehash: Buffer;
       owner: string;
       expiresAt: number;
       txId: string;
+      contractId?: string;
     }
-  | { kind: "registrarRenewal"; namehash: Buffer; expiresAt: number };
+  | { kind: "registrarRenewal"; namehash: Buffer; expiresAt: number; contractId?: string };
 
 
-export function extractMutations(event: NormalizedEvent, tld?: string): Mutation[] {
-  const { type, namehash, data, txId } = event;
+export function extractMutations(event: NormalizedEvent, tld?: string, registryId?: string): Mutation[] {
+  const { type, namehash, data, txId, contractId } = event;
   const mutations: Mutation[] = [];
+  const isRegistryEvent = contractId === registryId;
 
   if (typeof data.fqdn === "string") {
     mutations.push({
       kind: "ensureName",
       namehash,
-      fqdn: data.fqdn
+      fqdn: data.fqdn,
+      contractId
     });
   }
 
   switch (type) {
     case "resolver_changed": {
       const resolver = coerceString(data.resolver, "resolver");
-      mutations.push({ kind: "setResolver", namehash, resolver });
+      mutations.push({ kind: "setResolver", namehash, resolver, contractId });
       break;
     }
     case "renew": {
       const expiresAt = coerceNumber(data.expires_at ?? data.expiresAt, "expires_at");
-      mutations.push({ kind: "setExpiry", namehash, expiresAt });
+      mutations.push({ kind: "setExpiry", namehash, expiresAt, contractId });
       break;
     }
     case "transfer": {
       const owner = coerceString(data.to ?? data.owner ?? data.new_owner, "owner");
-      mutations.push({ kind: "setOwner", namehash, owner, source: "registry" });
+      mutations.push({ kind: "setOwner", namehash, owner, source: "registry", contractId: isRegistryEvent ? contractId : undefined });
       break;
     }
     case "address_changed": {
@@ -107,13 +111,15 @@ export function extractMutations(event: NormalizedEvent, tld?: string): Mutation
         kind: "setOwner",
         namehash,
         owner: address,
-        source: "resolver"
+        source: "resolver",
+        contractId
       });
       mutations.push({
         kind: "setRecord",
         namehash,
         key: addrKey,
-        value: Buffer.from(address, "utf8")
+        value: Buffer.from(address, "utf8"),
+        contractId
       });
       break;
     }
@@ -131,7 +137,8 @@ export function extractMutations(event: NormalizedEvent, tld?: string): Mutation
         mutations.push({
           kind: "ensureName",
           namehash,
-          fqdn
+          fqdn,
+          contractId
         });
       }
       
@@ -140,7 +147,8 @@ export function extractMutations(event: NormalizedEvent, tld?: string): Mutation
         namehash,
         owner,
         expiresAt,
-        txId
+        txId,
+        contractId
       });
       break;
     }
@@ -149,7 +157,7 @@ export function extractMutations(event: NormalizedEvent, tld?: string): Mutation
         data.expires_at ?? data.expiresAt,
         "expires_at"
       );
-      mutations.push({ kind: "registrarRenewal", namehash, expiresAt });
+      mutations.push({ kind: "registrarRenewal", namehash, expiresAt, contractId });
       break;
     }
     case "commit_made": {
@@ -163,7 +171,7 @@ export function extractMutations(event: NormalizedEvent, tld?: string): Mutation
         break;
       }
       const value = coerceBuffer(data.value ?? data.text, "value");
-      mutations.push({ kind: "setRecord", namehash, key, value });
+      mutations.push({ kind: "setRecord", namehash, key, value, contractId });
       break;
     }
     default:

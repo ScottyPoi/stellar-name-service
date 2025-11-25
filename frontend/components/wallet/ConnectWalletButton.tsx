@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useWallet } from "./WalletProvider";
+import { getNamesByOwner, type NameInfo } from "@/lib/indexerClient";
 
 export const ConnectWalletButton: React.FC = () => {
   const {
@@ -13,6 +14,33 @@ export const ConnectWalletButton: React.FC = () => {
     connect,
     disconnect,
   } = useWallet();
+  const [names, setNames] = useState<NameInfo[]>([]);
+  const [namesLoading, setNamesLoading] = useState(false);
+  const [namesError, setNamesError] = useState<string | null>(null);
+
+  const fetchNames = React.useCallback(async () => {
+    if (!publicKey) {
+      setNames([]);
+      setNamesError(null);
+      return;
+    }
+
+    setNamesLoading(true);
+    setNamesError(null);
+
+    try {
+      const response = await getNamesByOwner(publicKey);
+      setNames(response.names);
+      setNamesLoading(false);
+    } catch (err) {
+      setNamesError(err instanceof Error ? err.message : "Failed to fetch names");
+      setNamesLoading(false);
+    }
+  }, [publicKey]);
+
+  useEffect(() => {
+    fetchNames();
+  }, [fetchNames]);
 
   if (!isInstalled) {
     return (
@@ -49,6 +77,46 @@ export const ConnectWalletButton: React.FC = () => {
             {error}
           </div>
         )}
+        
+        <div className="pt-2 border-t">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs text-gray-500">Registered Names</div>
+            <button
+              onClick={fetchNames}
+              disabled={namesLoading || !publicKey}
+              className="px-2 py-1 text-xs border rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Refresh names list"
+            >
+              {namesLoading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+          {namesLoading ? (
+            <div className="text-xs text-gray-400">Loading names...</div>
+          ) : namesError ? (
+            <div className="text-xs text-red-600">{namesError}</div>
+          ) : names.length === 0 ? (
+            <div className="text-xs text-gray-400">No names registered to this account</div>
+          ) : (
+            <div className="space-y-2">
+              {names.map((name) => (
+                <div
+                  key={name.namehash}
+                  className="p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs"
+                >
+                  <div className="font-semibold text-gray-900 dark:text-gray-100">
+                    {name.fqdn}
+                  </div>
+                  {name.expires_at && (
+                    <div className="text-gray-500 mt-1">
+                      Expires: {new Date(name.expires_at).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           onClick={disconnect}
           className="px-3 py-1 border rounded text-xs"

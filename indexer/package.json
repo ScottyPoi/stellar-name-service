@@ -10,7 +10,8 @@
     "start": "node --env-file=.env dist/server.js",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "migrate": "tsx src/db.ts --migrate"
+    "migrate": "tsx src/db.ts --migrate",
+    "backfill": "tsx src/backfill.ts"
   },
   "dependencies": {
     "@fastify/etag": "^6.1.0",

@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { getPool } from "../db.js";
+import { getConfig } from "../config.js";
 import {
   fqdnToNamehash,
   normalizeFqdn,
@@ -18,7 +19,70 @@ type ResolveResponse = {
   namehash: string;
 };
 
+type NamesByOwnerResponse = {
+  names: Array<{
+    fqdn: string;
+    owner: string | null;
+    resolver: string | null;
+    expires_at: string | null;
+    namehash: string;
+  }>;
+};
+
 export async function registerResolveRoutes(app: FastifyInstance) {
+  app.get<{ Params: { owner: string } }>(
+    "/names/:owner",
+    async (request, reply): Promise<NamesByOwnerResponse | void> => {
+      const owner = request.params.owner;
+      if (!owner || owner.trim().length === 0) {
+        reply.code(400);
+        return reply.send({
+          error: "invalid_owner",
+          message: "Owner address is required"
+        });
+      }
+
+      const config = getConfig();
+      const pool = getPool();
+      const nameResult = await pool.query(
+        `
+          SELECT fqdn, owner, resolver, expires_at, namehash
+          FROM names
+          WHERE owner = $1 AND registry_contract_id = $2
+          ORDER BY fqdn ASC
+        `,
+        [owner.trim(), config.registryId]
+      );
+
+      const names = nameResult.rows.map((row) => {
+        const expiresRaw = row.expires_at;
+        const expiresSeconds =
+          expiresRaw === null
+            ? null
+            : Number.parseInt(expiresRaw.toString(), 10);
+        const expiresIso =
+          expiresSeconds === null || Number.isNaN(expiresSeconds)
+            ? null
+            : new Date(expiresSeconds * 1000).toISOString();
+
+        const namehashBuffer = row.namehash as Buffer;
+        const namehashHex = namehashBuffer.toString("hex");
+
+        return {
+          fqdn: row.fqdn,
+          owner: row.owner,
+          resolver: row.resolver,
+          expires_at: expiresIso,
+          namehash: namehashHex,
+        };
+      });
+
+      reply.header("Cache-Control", "public, max-age=5");
+
+      return { names };
+    }
+  );
+
   app.get<{ Params: { name: string } }>(
     "/resolve/:name",
     async (request, reply): Promise<ResolveResponse | void> => {
@@ -37,14 +101,15 @@ export async function registerResolveRoutes(app: FastifyInstance) {
       const namehashBuffer = fqdnToNamehash(normalized);
       const namehashHex = namehashBuffer.toString("hex");
 
+      const config = getConfig();
       const pool = getPool();
       const nameResult = await pool.query(
         `
           SELECT fqdn, owner, resolver, expires_at
           FROM names
-          WHERE namehash = $1
+          WHERE namehash = $1 AND registry_contract_id = $2
         `,
-        [namehashBuffer]
+        [namehashBuffer, config.registryId]
       );
 
       if (nameResult.rowCount === 0) {

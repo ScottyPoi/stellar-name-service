@@ -49,6 +49,9 @@ OWNER_ADDR="${OWNER_ADDR:-${ACCOUNT:-}}"
 # and only then to ACCOUNT (address) if nothing else is provided.
 OWNER_SKEY="${OWNER_SKEY:-${IDENTITY:-${ACCOUNT:-}}}"
 
+# Track if --owner-addr was explicitly set via flag
+OWNER_ADDR_EXPLICIT=0
+
 # Parse flags
 shift || true
 
@@ -72,8 +75,8 @@ while [[ $# -gt 0 ]]; do
     --registry-id)    REGISTRY_ID="$2"; shift 2;;
     --resolver-id=*)  RESOLVER_ID="${1#*=}"; shift;;
     --resolver-id)    RESOLVER_ID="$2"; shift 2;;
-    --owner-addr=*)   OWNER_ADDR="${1#*=}"; shift;;
-    --owner-addr)     OWNER_ADDR="$2"; shift 2;;
+    --owner-addr=*)   OWNER_ADDR="${1#*=}"; OWNER_ADDR_EXPLICIT=1; shift;;
+    --owner-addr)     OWNER_ADDR="$2"; OWNER_ADDR_EXPLICIT=1; shift 2;;
     --owner-skey=*)   OWNER_SKEY="${1#*=}"; shift;;
     --owner-skey)     OWNER_SKEY="$2"; shift 2;;
     --network-passphrase=*) NETWORK_PASSPHRASE="${1#*=}"; shift;;
@@ -153,6 +156,28 @@ fi
 if ! command -v soroban >/dev/null 2>&1; then
   echo "Error: soroban CLI not found. Install and configure it."
   exit 1
+fi
+
+# If OWNER_SKEY is a soroban identity alias (not a G-address and not a secret seed starting with 'S'),
+# automatically extract its address and use it for ACCOUNT and OWNER_ADDR (unless OWNER_ADDR was explicitly set).
+if [[ -n "${OWNER_SKEY}" ]] && [[ ! "${OWNER_SKEY}" =~ ^G[A-Z0-9]{55}$ ]] && [[ ! "${OWNER_SKEY}" =~ ^S[A-Z0-9]{55}$ ]]; then
+  # Try to resolve as a soroban identity alias
+  if IDENTITY_ADDR="$(soroban keys address "${OWNER_SKEY}" 2>/dev/null)"; then
+    if [[ ${OWNER_ADDR_EXPLICIT} -eq 0 ]]; then
+      # Use the identity's address for ACCOUNT and OWNER_ADDR
+      ACCOUNT="${IDENTITY_ADDR}"
+      OWNER_ADDR="${IDENTITY_ADDR}"
+      if [[ "${DEBUG:-}" == "1" ]]; then
+        echo "DEBUG: Resolved identity '${OWNER_SKEY}' to address '${IDENTITY_ADDR}'"
+        echo "DEBUG: Updated ACCOUNT and OWNER_ADDR to '${IDENTITY_ADDR}'"
+      fi
+    else
+      if [[ "${DEBUG:-}" == "1" ]]; then
+        echo "DEBUG: Resolved identity '${OWNER_SKEY}' to address '${IDENTITY_ADDR}'"
+        echo "DEBUG: OWNER_ADDR was explicitly set, not updating"
+      fi
+    fi
+  fi
 fi
 
 # Generate a random 32-byte secret (hex)

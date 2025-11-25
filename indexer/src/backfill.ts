@@ -1,4 +1,3 @@
-import { rpc, scValToNative, xdr, nativeToScVal } from "@stellar/stellar-sdk";
 import { getConfig } from "./config.js";
 import { getPool } from "./db.js";
 import { logger } from "./utils/logger.js";
@@ -44,7 +43,6 @@ export async function backfillRegistryContractIds(): Promise<void> {
     try {
       // Check the events table to find which contract emitted transfer events for this namehash
       // We'll look for the most recent transfer event from a registry contract
-      const namehashHexForQuery = namehashHex;
       
       // Query events table for transfer events with this namehash
       // The payload JSONB contains contractId and topic array where topic[1] is the namehash
@@ -62,10 +60,10 @@ export async function backfillRegistryContractIds(): Promise<void> {
           ORDER BY ts DESC
           LIMIT 1
         `,
-        [namehashHexForQuery, config.registryId, config.resolverId, config.registrarId]
+        [namehashHex, config.registryId, config.resolverId, config.registrarId]
       );
 
-      if (eventResult.rowCount > 0) {
+      if (eventResult.rowCount && eventResult.rowCount > 0) {
         const contractId = eventResult.rows[0].contract_id as string;
         
         // If the transfer event came from the current registry, update it
@@ -96,10 +94,10 @@ export async function backfillRegistryContractIds(): Promise<void> {
               AND (payload->>'contractId')::text = $2
             LIMIT 1
           `,
-          [namehashHexForQuery, config.registryId]
+          [namehashHex, config.registryId]
         );
 
-        if (anyEventResult.rowCount > 0) {
+        if (anyEventResult.rowCount && anyEventResult.rowCount > 0) {
           // Found events from current registry, update it
           await pool.query(
             `UPDATE names SET registry_contract_id = $1 WHERE namehash = $2`,

@@ -10,6 +10,7 @@ import {
 import { SearchBox } from "@/components/resolver/SearchBox";
 import { StatusBanner } from "@/components/resolver/StatusBanner";
 import { ResultCard } from "@/components/resolver/ResultCard";
+import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 
 type ResolverState = "idle" | "loading" | "success" | "not_found" | "error";
 
@@ -254,7 +255,9 @@ export default function Home() {
           Indexer.
         </p>
       </div>
-
+      <div className="space-y-4">
+        <ConnectWalletButton />
+      </div>
       <div className="space-y-6">
         <SearchBox
           value={query}

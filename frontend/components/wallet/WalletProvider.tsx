@@ -101,8 +101,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({
       console.error(e);
       setError(e?.message ?? "Failed to connect Freighter");
     } finally {
-      const netRes = await getNetwork();
-      console.log("Freighter network:", netRes.network);
       setIsConnecting(false);
     }
   }, []);

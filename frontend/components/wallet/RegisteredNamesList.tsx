@@ -96,7 +96,7 @@ export function RegisteredNamesList() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {names.map((name) => (
-          <NameCard key={name.namehash} name={name} />
+          <NameCard key={name.namehash} name={name} onRenewed={fetchNames} />
         ))}
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { AppBar, Avatar, Box, Button, IconButton, Stack, Toolbar, Typography } from "@mui/material";
 import { useWallet } from "@/components/wallet/WalletProvider";
 import { MenuSheet } from "./MenuSheet";
@@ -62,31 +63,48 @@ export function Header() {
 
           <Stack direction="row" spacing={1.5} alignItems="center">
             {publicKey ? (
-              <Button
-                variant="outlined"
-                color="inherit"
-                onClick={() => setMenuOpen(true)}
-                startIcon={
-                  <Avatar
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      background:
-                        "linear-gradient(135deg, rgba(124,155,255,0.8), rgba(192,132,252,0.8))",
-                    }}
-                  >
-                    {(publicKey ?? "S").slice(0, 1)}
-                  </Avatar>
-                }
-                sx={{
-                  borderColor: "rgba(255,255,255,0.12)",
-                  color: "text.primary",
-                  px: 2,
-                  "&:hover": { borderColor: "rgba(255,255,255,0.2)" },
-                }}
-              >
-                {shortAddress}
-              </Button>
+              <>
+                <Button
+                  component={Link}
+                  href="/my-names"
+                  variant="outlined"
+                  color="inherit"
+                  sx={{
+                    borderColor: "rgba(255,255,255,0.12)",
+                    color: "text.primary",
+                    px: 2.5,
+                    display: { xs: "none", sm: "inline-flex" },
+                    "&:hover": { borderColor: "rgba(255,255,255,0.2)" },
+                  }}
+                >
+                  My names
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  onClick={() => setMenuOpen(true)}
+                  startIcon={
+                    <Avatar
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        background:
+                          "linear-gradient(135deg, rgba(124,155,255,0.8), rgba(192,132,252,0.8))",
+                      }}
+                    >
+                      {(publicKey ?? "S").slice(0, 1)}
+                    </Avatar>
+                  }
+                  sx={{
+                    borderColor: "rgba(255,255,255,0.12)",
+                    color: "text.primary",
+                    px: 2,
+                    "&:hover": { borderColor: "rgba(255,255,255,0.2)" },
+                  }}
+                >
+                  {shortAddress}
+                </Button>
+              </>
             ) : (
               <Button
                 variant="contained"

@@ -48,7 +48,7 @@ type SortOption = "name" | "expiry" | "newest";
 
 export default function MyNamesPage() {
   const router = useRouter();
-  const { publicKey } = useWallet();
+  const { publicKey, connect, isConnecting } = useWallet();
   const [names, setNames] = useState<NameInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +118,14 @@ export default function MyNamesPage() {
             <Typography variant="body2" color="text.secondary">
               Connect your Freighter wallet to view registered names.
             </Typography>
+            <Button
+              variant="contained"
+              sx={{ mt: 3, px: 3 }}
+              onClick={connect}
+              disabled={isConnecting}
+            >
+              {isConnecting ? "Connecting…" : "Connect Freighter"}
+            </Button>
           </CardContent>
         </Card>
       </Container>
@@ -158,6 +166,14 @@ export default function MyNamesPage() {
             <MenuItem value="expiry">Sort by Expiry</MenuItem>
             <MenuItem value="newest">Sort by Newest</MenuItem>
           </Select>
+          <Button
+            variant="outlined"
+            onClick={() => fetchNames()}
+            disabled={loading}
+            sx={{ minWidth: 120 }}
+          >
+            {loading ? "Refreshing…" : "Refresh"}
+          </Button>
         </Stack>
 
         {loading && (
@@ -258,16 +274,7 @@ export default function MyNamesPage() {
             ))}
           </Stack>
         )}
-
-        <Card>
-          <CardContent sx={{ textAlign: "center" }}>
-            <Typography variant="caption" color="text.secondary">
-              Some names may not appear (offchain). Search directly to view.
-            </Typography>
-          </CardContent>
-        </Card>
       </Stack>
     </Container>
   );
 }
-

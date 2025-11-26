@@ -5,7 +5,11 @@ import { useWallet } from "./WalletProvider";
 import { getNamesByOwner, type NameInfo } from "@/lib/indexerClient";
 import { NameCard } from "./NameCard";
 
-export function RegisteredNamesList() {
+interface RegisteredNamesListProps {
+  refreshToken?: number;
+}
+
+export function RegisteredNamesList({ refreshToken }: RegisteredNamesListProps) {
   const { publicKey } = useWallet();
   const [names, setNames] = useState<NameInfo[]>([]);
   const [namesLoading, setNamesLoading] = useState(false);
@@ -33,7 +37,7 @@ export function RegisteredNamesList() {
 
   useEffect(() => {
     fetchNames();
-  }, [fetchNames]);
+  }, [fetchNames, refreshToken]);
 
   if (!publicKey) {
     return null;
@@ -102,4 +106,3 @@ export function RegisteredNamesList() {
     </div>
   );
 }
-

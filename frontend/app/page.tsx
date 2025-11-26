@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { StrKey } from "@stellar/stellar-sdk";
+import { Box, Container, Paper, Stack, Typography } from "@mui/material";
 import {
   getHealth,
   resolveName,
@@ -13,9 +14,6 @@ import {
 import { SearchBox } from "@/components/resolver/SearchBox";
 import { StatusBanner } from "@/components/resolver/StatusBanner";
 import { ResultCard } from "@/components/resolver/ResultCard";
-import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
-import { RegisteredNamesList } from "@/components/wallet/RegisteredNamesList";
-import { RegisterNameCard } from "@/components/wallet/RegisterNameCard";
 
 type ResolverState = "idle" | "loading" | "success" | "not_found" | "error";
 
@@ -292,206 +290,68 @@ export default function Home() {
     );
   }
 
-  const healthPayload =
-    health?.raw ??
-    (healthError
-      ? { error: healthError }
-      : { status: healthLoading ? "checking" : "unavailable" });
-
   return (
-    <section className="space-y-10 pb-16">
-      <div className="space-y-2 text-center">
-        <p className="text-sm uppercase tracking-[0.3em] text-slate-500">
-          Stellar Name Service
-        </p>
-        <h1 className="text-3xl font-semibold text-white sm:text-4xl">
-          Look up any .stellar name
-        </h1>
-        <p className="text-base text-slate-300">
-          Quickly resolve owners, resolvers, and linked records directly from the
-          Indexer.
-        </p>
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ConnectWalletButton />
-        <RegisterNameCard
-          onRegistered={() => setNamesRefreshToken((val) => val + 1)}
-        />
-      </div>
-
-      <RegisteredNamesList refreshToken={namesRefreshToken} />
-      
-      <div className="space-y-6">
-        <div className="space-y-2 text-center">
-          <h2 className="text-xl font-semibold text-white">Search by Address</h2>
-          <p className="text-sm text-slate-400">
-            Find all names registered to a specific Stellar address
-          </p>
-        </div>
-        
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            searchByAddress(addressQuery);
-          }}
-          className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-6 shadow-inner"
-        >
-          <label
-            htmlFor="address"
-            className="text-sm font-medium uppercase tracking-wide text-slate-400"
+    <Container
+      maxWidth="lg"
+      sx={{
+        minHeight: "calc(100vh - 180px)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        py: { xs: 6, md: 10 },
+        gap: 6,
+      }}
+    >
+      <Stack spacing={4} alignItems="center">
+        <Stack spacing={2} alignItems="center" textAlign="center" maxWidth={840}>
+          <Typography
+            variant="h2"
+            sx={{
+              fontWeight: 800,
+              background:
+                "linear-gradient(120deg, #7c9bff 0%, #c084fc 60%, #f472b6 100%)",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
+            }}
           >
-            Stellar Address
-          </label>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="flex-1">
-              <input
-                id="address"
-                type="text"
-                value={addressQuery}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setAddressQuery(value);
-                  const trimmed = value.trim();
-                  
-                  // Clear error if input becomes valid
-                  if (trimmed && StrKey.isValidEd25519PublicKey(trimmed)) {
-                    setAddressValidationError(null);
-                    return;
-                  }
-                  
-                  // Show early feedback for obvious errors (not just incomplete)
-                  if (trimmed.length >= 2 && !trimmed.startsWith("G")) {
-                    setAddressValidationError("Stellar address must start with 'G'");
-                  } else if (trimmed.length > 56) {
-                    setAddressValidationError("Stellar address must be 56 characters long");
-                  } else if (addressValidationError && trimmed.length < 56) {
-                    // Clear error if user is still typing (address might be incomplete)
-                    setAddressValidationError(null);
-                  }
-                }}
-                onBlur={(e) => {
-                  // Validate on blur to show error if user leaves invalid input
-                  const trimmed = e.target.value.trim();
-                  if (trimmed) {
-                    const error = validateStellarAddress(trimmed);
-                    setAddressValidationError(error);
-                  } else {
-                    setAddressValidationError(null);
-                  }
-                }}
-                placeholder="G..."
-                className={`w-full rounded-xl border bg-slate-950/80 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 ${
-                  addressValidationError
-                    ? "border-red-500 focus:border-red-500 focus:ring-red-500/40"
-                    : "border-slate-700/70 focus:border-sky-500 focus:ring-sky-500/40"
-                }`}
-              />
-              {addressValidationError && (
-                <p className="mt-1 text-sm text-red-400">{addressValidationError}</p>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={
-                addressSearchLoading ||
-                !addressQuery.trim() ||
-                !!addressValidationError ||
-                !StrKey.isValidEd25519PublicKey(addressQuery.trim())
+            Your Stellar username
+          </Typography>
+        </Stack>
+
+        <Box width="100%" maxWidth={760}>
+          <SearchBox
+            value={query}
+            loading={resolverStatus === "loading"}
+            onChange={setQuery}
+            onSubmit={() => {
+              const normalized = toNormalizedFqdn(query);
+              if (normalized) {
+                router.push(`/name/${normalized}`);
               }
-              className="rounded-xl bg-sky-500 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-600"
-            >
-              {addressSearchLoading ? "Searching..." : "Search"}
-            </button>
-          </div>
-        </form>
+            }}
+            suffix={STELLAR_SUFFIX}
+            placeholder="Search for a name"
+            size="lg"
+          />
+        </Box>
 
-        {addressSearchError && (
-          <div className="rounded-xl border border-red-800/60 bg-red-900/20 p-4">
-            <p className="text-sm text-red-400">{addressSearchError}</p>
-          </div>
-        )}
+        <Box width="100%" maxWidth={760}>
+          {renderHealthStatus()}
+        </Box>
+      </Stack>
 
-        {addressSearchResults.length > 0 && (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-800/60 bg-slate-900/40 p-6 shadow-inner">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                Names Registered to {addressQuery}
-              </h3>
-              <div className="space-y-2">
-                {addressSearchResults.map((name) => (
-                  <div
-                    key={name.namehash}
-                    className="p-4 bg-slate-950/80 rounded-xl border border-slate-700/70"
-                  >
-                    <div className="font-semibold text-white text-base">
-                      {name.fqdn}
-                    </div>
-                    {name.expires_at && (
-                      <div className="text-sm text-slate-400 mt-1">
-                        Expires: {new Date(name.expires_at).toLocaleDateString()}
-                      </div>
-                    )}
-                    {name.resolver && (
-                      <div className="text-xs text-slate-500 mt-1 font-mono">
-                        Resolver: {name.resolver}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!addressSearchLoading && addressQuery.trim() && addressSearchResults.length === 0 && !addressSearchError && (
-          <div className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-4">
-            <p className="text-sm text-slate-400">
-              No names found for address {addressQuery}
-            </p>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-6">
-        <div className="space-y-2 text-center">
-          <h2 className="text-xl font-semibold text-white">Resolve Name</h2>
-          <p className="text-sm text-slate-400">
-            Look up a .stellar name to view its details
-          </p>
-        </div>
-        
-        <SearchBox
-          value={query}
-          loading={resolverStatus === "loading"}
-          onChange={setQuery}
-          onSubmit={() => lookupName()}
-          suffix={STELLAR_SUFFIX}
-        />
-
-        <div ref={resultRef} className="space-y-4">
+      {resolverStatus !== "idle" && (
+        <Stack
+          spacing={2.5}
+          ref={resultRef}
+          sx={{ width: "100%", maxWidth: 1000, mx: "auto", pb: 6 }}
+        >
           {renderResolverStatus()}
           {resolverStatus === "success" && resolvedName && resolvedData ? (
             <ResultCard fqdn={resolvedName} data={resolvedData} />
           ) : null}
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-800/70 bg-slate-900/40 p-6 shadow-inner">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-200">
-              Indexer health
-            </p>
-            <p className="text-xs text-slate-500">
-              Keeps the UI in sync with on-chain data.
-            </p>
-          </div>
-        </div>
-        <div className="mt-4">{renderHealthStatus()}</div>
-        <pre className="mt-4 max-h-64 overflow-auto rounded-xl bg-slate-950/80 p-4 text-xs text-slate-200">
-          {JSON.stringify(healthPayload, null, 2)}
-        </pre>
-      </div>
-    </section>
+        </Stack>
+      )}
+    </Container>
   );
 }

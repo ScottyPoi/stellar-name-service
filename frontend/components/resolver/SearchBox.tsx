@@ -1,4 +1,12 @@
 import { FormEvent } from "react";
+import {
+  Button,
+  InputAdornment,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 
 interface SearchBoxProps {
   value: string;
@@ -6,6 +14,8 @@ interface SearchBoxProps {
   onChange: (value: string) => void;
   onSubmit: () => void;
   suffix?: string;
+  placeholder?: string;
+  size?: "sm" | "lg";
 }
 
 export function SearchBox({
@@ -14,6 +24,8 @@ export function SearchBox({
   onChange,
   onSubmit,
   suffix = ".stellar",
+  placeholder = "Search for a name",
+  size = "sm",
 }: SearchBoxProps) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -23,43 +35,64 @@ export function SearchBox({
     onSubmit();
   }
 
+  const isLarge = size === "lg";
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-6 shadow-inner"
-    >
-      <label
-        htmlFor="fqdn"
-        className="text-sm font-medium uppercase tracking-wide text-slate-400"
+    <form onSubmit={handleSubmit} style={{ width: "100%" }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: isLarge ? 1.25 : 1,
+          borderRadius: isLarge ? 999 : 18,
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          border: "1px solid rgba(255,255,255,0.08)",
+          background:
+            "linear-gradient(135deg, rgba(124,155,255,0.08), rgba(192,132,252,0.06))",
+        }}
       >
-        Search for a Stellar name
-      </label>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="flex flex-1 items-center rounded-xl border border-slate-700/70 bg-slate-950/80 pr-3 text-base shadow focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-500/40">
-          <input
-            id="fqdn"
-            type="text"
-            value={value}
-            placeholder="example"
-            onChange={(event) => onChange(event.target.value)}
-            className="flex-1 bg-transparent px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none"
-          />
-          <span className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-            {suffix}
-          </span>
-        </div>
-        <button
-          type="submit"
-          disabled={loading || !value.trim()}
-          className="rounded-xl bg-sky-500 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-600"
-        >
-          {loading ? "Searching..." : "Search"}
-        </button>
-      </div>
-      <p className="text-xs text-slate-500">
-        Tip: we automatically append{" "}
-        <span className="font-mono text-slate-200">{suffix}</span> to your search.
-      </p>
+        <TextField
+          fullWidth
+          id="fqdn"
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          variant="outlined"
+          inputProps={{ style: { padding: isLarge ? "16px 14px" : "12px 14px" } }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <Typography variant="body2" color="text.secondary">
+                  {suffix}
+                </Typography>
+              </InputAdornment>
+            ),
+            sx: {
+              pr: 1,
+            },
+          }}
+          sx={{
+            "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+          }}
+        />
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={loading || !value.trim()}
+            sx={{
+              px: isLarge ? 3 : 2.5,
+              py: isLarge ? 1.25 : 1,
+              borderRadius: 999,
+              background:
+                "linear-gradient(135deg, rgba(124,155,255,1), rgba(192,132,252,0.95))",
+            }}
+          >
+            {loading ? "Searching…" : "Search"}
+          </Button>
+        </Stack>
+      </Paper>
     </form>
   );
 }

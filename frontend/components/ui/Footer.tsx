@@ -1,12 +1,42 @@
-import { Container } from "./Container";
+import { Box, Container, Link, Stack, Typography } from "@mui/material";
 
 export function Footer() {
+  const year = new Date().getFullYear();
   return (
-    <footer className="border-t border-slate-800/60 bg-slate-950/80 py-6 text-sm text-slate-400">
-      <Container className="flex items-center justify-between gap-4">
-        <p>© {new Date().getFullYear()} Stellar Name Service</p>
-        <p className="text-slate-500">Built for Soroban explorers</p>
+    <Box
+      component="footer"
+      sx={{
+        borderTop: "1px solid",
+        borderColor: "divider",
+        background:
+          "linear-gradient(90deg, rgba(124,155,255,0.08), rgba(192,132,252,0.04))",
+        py: 4,
+        mt: "auto",
+      }}
+    >
+      <Container maxWidth="lg">
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          alignItems="center"
+          justifyContent="space-between"
+          gap={2}
+        >
+          <Typography variant="body2" color="text.secondary">
+            © {year} Stellar Name Service
+          </Typography>
+          <Stack direction="row" spacing={3}>
+            <Link href="#" color="text.secondary" underline="hover" variant="body2">
+              Docs
+            </Link>
+            <Link href="#" color="text.secondary" underline="hover" variant="body2">
+              Support
+            </Link>
+            <Link href="#" color="text.secondary" underline="hover" variant="body2">
+              GitHub
+            </Link>
+          </Stack>
+        </Stack>
       </Container>
-    </footer>
+    </Box>
   );
 }

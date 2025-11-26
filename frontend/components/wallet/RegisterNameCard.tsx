@@ -60,7 +60,7 @@ export function RegisterNameCard({ onRegistered }: RegisterNameCardProps) {
     if (!normalized) {
       return "Enter a label to register (without .stellar)";
     }
-    if (normalized.length < 1 || normalized.length > 63) {
+    if (normalized.length > 63) {
       return "Label must be between 1 and 63 characters.";
     }
     if (!/^[a-z0-9-]+$/.test(normalized)) {

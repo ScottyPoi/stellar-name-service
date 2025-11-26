@@ -18,6 +18,7 @@ import { useWallet } from "@/components/wallet/WalletProvider";
 import { StatusBanner } from "@/components/resolver/StatusBanner";
 import { ResultCard } from "@/components/resolver/ResultCard";
 import { NameCard } from "@/components/wallet/NameCard";
+import { RegisterNameCard } from "@/components/wallet/RegisterNameCard";
 
 type ResolverState = "idle" | "loading" | "success" | "not_found" | "error";
 
@@ -113,6 +114,8 @@ export default function NameDetailsPage() {
   const isOwnedByUser = publicKey && owner && owner === publicKey;
   const isAvailable = resolverStatus === "not_found";
   const isOwnedByOther = resolverStatus === "success" && owner && !isOwnedByUser;
+  const suggestedLabel =
+    fqdn?.toLowerCase().endsWith(".stellar") ? fqdn.split(".")[0] : fqdn;
 
   function renderStatusBanner() {
     if (resolverStatus === "loading") {
@@ -198,6 +201,20 @@ export default function NameDetailsPage() {
           </Typography>
           {renderStatusBanner()}
         </Stack>
+
+        {isAvailable && (
+          <Stack spacing={2}>
+            <Typography variant="h6" fontWeight={700}>
+              Register this name
+            </Typography>
+            <RegisterNameCard
+              initialLabel={suggestedLabel ?? ""}
+              onRegistered={() => {
+                lookupName();
+              }}
+            />
+          </Stack>
+        )}
 
         {resolverStatus === "success" && resolvedData && (
           <Stack spacing={3}>
@@ -329,4 +346,3 @@ function InfoCard({
     </Card>
   );
 }
-

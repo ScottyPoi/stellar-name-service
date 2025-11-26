@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { BASE_FEE, TransactionBuilder, rpc, xdr, Operation } from "@stellar/stellar-sdk";
 import { useWallet } from "./WalletProvider";
 import { config } from "@/lib/config";
@@ -13,6 +13,17 @@ import {
   generateSecretBytes,
   getRpcUrl,
 } from "@/lib/contractUtils";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Divider,
+  Stack,
+  Typography,
+} from "@mui/material";
 
 type StepState = "pending" | "active" | "success" | "error";
 
@@ -25,11 +36,12 @@ interface Step {
 
 interface RegisterNameCardProps {
   onRegistered?: () => void;
+  initialLabel?: string;
 }
 
 const DEFAULT_COMMIT_WAIT_SECS = 12;
 
-export function RegisterNameCard({ onRegistered }: RegisterNameCardProps) {
+export function RegisterNameCard({ onRegistered, initialLabel }: RegisterNameCardProps) {
   const {
     publicKey,
     network,
@@ -37,14 +49,19 @@ export function RegisterNameCard({ onRegistered }: RegisterNameCardProps) {
     signTx,
   } = useWallet();
 
-  const [label, setLabel] = useState("");
-  const [resolver, setResolver] = useState(config.resolverId ?? "");
+  const [label, setLabel] = useState(initialLabel ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusNote, setStatusNote] = useState<string | null>(null);
   const [statusIsError, setStatusIsError] = useState(false);
   const [steps, setSteps] = useState<Step[]>(() => buildDefaultSteps());
   const [commitmentHex, setCommitmentHex] = useState<string | null>(null);
   const [registerHash, setRegisterHash] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialLabel) {
+      setLabel(initialLabel);
+    }
+  }, [initialLabel]);
 
   const rpcServer = useMemo(() => {
     const rpcUrl = getRpcUrl(network);
@@ -58,7 +75,7 @@ export function RegisterNameCard({ onRegistered }: RegisterNameCardProps) {
   const labelError = useMemo(() => {
     const normalized = label.trim().toLowerCase();
     if (!normalized) {
-      return "Enter a label to register (without .stellar)";
+      return "Missing name label.";
     }
     if (normalized.length > 63) {
       return "Label must be between 1 and 63 characters.";
@@ -214,7 +231,7 @@ export function RegisterNameCard({ onRegistered }: RegisterNameCardProps) {
         normalizedLabel,
         publicKey,
         secretHex,
-        resolver || null
+        config.resolverId || null
       );
       const registerResult = await sendOperation(registerOp);
       setRegisterHash(registerResult.hash);
@@ -265,7 +282,6 @@ export function RegisterNameCard({ onRegistered }: RegisterNameCardProps) {
     onRegistered,
     publicKey,
     resetSteps,
-    resolver,
     sendOperation,
   ]);
 
@@ -282,123 +298,125 @@ export function RegisterNameCard({ onRegistered }: RegisterNameCardProps) {
   const statusToneIsError = hasErroredStep || statusIsError;
 
   return (
-    <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 p-6 shadow-inner space-y-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-semibold text-white">Register a new name</h2>
-        <p className="text-sm text-slate-400">
-          Commits and reveals happen from your connected wallet using the registrar contract.
-        </p>
-      </div>
+    <Card>
+      <CardContent>
+        <Stack spacing={3}>
+          <Stack spacing={0.75}>
+            <Typography variant="overline" color="text.secondary">
+              Registration
+            </Typography>
+            <Typography variant="h5" fontWeight={800}>
+              Register {label ? `${label}.stellar` : "this name"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Commit + reveal using your connected Freighter wallet. Default resolver will be applied automatically.
+            </Typography>
+          </Stack>
 
-      <div className="grid gap-4 md:grid-cols-[2fr,1fr] md:items-end">
-        <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Name label
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value.toLowerCase())}
-              placeholder="example"
-              className={`flex-1 rounded-xl border bg-slate-950/80 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 ${
-                labelError
-                  ? "border-red-500 focus:border-red-500 focus:ring-red-500/40"
-                  : "border-slate-700/70 focus:border-sky-500 focus:ring-sky-500/40"
-              }`}
-            />
-            <span className="rounded-xl border border-slate-800/70 bg-slate-900/80 px-3 py-2 text-sm text-slate-200">
-              .stellar
-            </span>
-          </div>
-          {labelError ? (
-            <p className="text-sm text-red-400">{labelError}</p>
-          ) : (
-            <p className="text-xs text-slate-500">
-              Lowercase letters, numbers, and interior hyphens allowed.
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Resolver (optional)
-          </label>
-          <input
-            type="text"
-            value={resolver}
-            onChange={(e) => setResolver(e.target.value)}
-            placeholder="Leave blank to skip"
-            className="w-full rounded-xl border border-slate-700/70 bg-slate-950/80 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:border-sky-500 focus:ring-sky-500/40"
-          />
-          <p className="text-xs text-slate-500">
-            This field is pre-filled with the default resolver ID ({config.resolverId}). If left blank, the default resolver will be used.
-          </p>
-        </div>
-      </div>
-
-      <button
-        onClick={handleRegister}
-        disabled={buttonDisabled}
-        className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-emerald-400 disabled:bg-slate-700/50 disabled:text-slate-400 disabled:cursor-not-allowed"
-      >
-        {isSubmitting ? "Registering…" : "Register name"}
-      </button>
-
-      <div className="space-y-3 rounded-xl border border-slate-800/60 bg-slate-950/60 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Registration status
-        </p>
-        <ul className="space-y-2">
-          {steps.map((step) => (
-            <li key={step.key} className="flex gap-3 text-sm">
-              <StepBadge state={step.state} />
-              <div className="flex flex-col gap-1">
-                <span className="text-slate-100">{step.label}</span>
-                {step.detail && (
-                  <span
-                    className={`text-xs ${
-                      step.state === "error"
-                        ? "text-red-300"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    {step.detail}
-                  </span>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-
-        {commitmentHex && (
-          <div className="rounded-lg bg-slate-900/80 p-3 text-xs text-slate-400 break-words">
-            Commitment: <span className="text-slate-200">{commitmentHex}</span>
-          </div>
-        )}
-        {registerHash && (
-          <div className="rounded-lg bg-slate-900/80 p-3 text-xs text-slate-400 break-words">
-            Register tx hash: <span className="text-slate-200">{registerHash}</span>
-          </div>
-        )}
-        {statusNote && (
-          <div
-            className={`rounded-lg p-3 text-sm ${
-              statusToneIsError
-                ? "bg-red-900/30 text-red-200"
-                : "bg-emerald-900/20 text-emerald-200"
-            }`}
+          <Box
+            sx={{
+              px: 2,
+              py: 1.5,
+              borderRadius: 2,
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.03)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 2,
+              flexWrap: "wrap",
+            }}
           >
-            {statusNote}
-          </div>
-        )}
-        {!publicKey && (
-          <div className="rounded-lg bg-slate-900/80 p-3 text-sm text-slate-400">
-            Connect Freighter to register a name.
-          </div>
-        )}
-      </div>
-    </div>
+            <Stack spacing={0.5}>
+              <Typography variant="caption" color="text.secondary">
+                Name
+              </Typography>
+              <Chip
+                label={label ? `${label}.stellar` : "Name pending"}
+                color="primary"
+                variant="outlined"
+                sx={{
+                  borderColor: "rgba(255,255,255,0.14)",
+                  fontWeight: 700,
+                  px: 1,
+                  height: 34,
+                }}
+              />
+            </Stack>
+            {!publicKey && (
+              <Typography variant="body2" color="warning.main">
+                Connect Freighter to continue.
+              </Typography>
+            )}
+          </Box>
+
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={handleRegister}
+            disabled={buttonDisabled}
+            sx={{ py: 1.25, fontWeight: 700 }}
+            fullWidth
+          >
+            {isSubmitting ? "Registering…" : "Register name"}
+          </Button>
+
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 0.4 }}>
+              Registration status
+            </Typography>
+            <Stack spacing={1.25} mt={1.25}>
+              {steps.map((step) => (
+                <Stack
+                  key={step.key}
+                  direction="row"
+                  spacing={1.5}
+                  alignItems="flex-start"
+                  sx={{
+                    px: 1.25,
+                    py: 0.75,
+                    borderRadius: 1.5,
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "rgba(255,255,255,0.02)",
+                  }}
+                >
+                  <StepBadge state={step.state} />
+                  <Box>
+                    <Typography variant="body2" color="text.primary">
+                      {step.label}
+                    </Typography>
+                    {step.detail && (
+                      <Typography
+                        variant="caption"
+                        color={step.state === "error" ? "error.main" : "text.secondary"}
+                      >
+                        {step.detail}
+                      </Typography>
+                    )}
+                  </Box>
+                </Stack>
+              ))}
+            </Stack>
+          </Box>
+
+          <Divider />
+
+          <Stack spacing={1}>
+            {commitmentHex && (
+              <StatusRow label="Commitment" value={commitmentHex} />
+            )}
+            {registerHash && (
+              <StatusRow label="Register tx hash" value={registerHash} />
+            )}
+            {statusNote && (
+              <Alert severity={statusToneIsError ? "error" : "success"} variant="outlined">
+                {statusNote}
+              </Alert>
+            )}
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -413,27 +431,16 @@ function buildDefaultSteps(): Step[] {
 }
 
 function StepBadge({ state }: { state: StepState }) {
-  const styles: Record<StepState, string> = {
-    pending: "bg-slate-800/70 text-slate-400 border-slate-700/70",
-    active: "bg-sky-500/20 text-sky-200 border-sky-400/70",
-    success: "bg-emerald-500/20 text-emerald-200 border-emerald-400/70",
-    error: "bg-red-500/20 text-red-200 border-red-400/70",
-  };
-  const label: Record<StepState, string> = {
-    pending: "•",
-    active: "…",
-    success: "✓",
-    error: "!",
+  const tone: Record<StepState, { label: string; color: "default" | "info" | "success" | "error" }> = {
+    pending: { label: "Pending", color: "default" },
+    active: { label: "In progress", color: "info" },
+    success: { label: "Done", color: "success" },
+    error: { label: "Error", color: "error" },
   };
 
-  return (
-    <span
-      className={`mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold ${styles[state]}`}
-      aria-label={state}
-    >
-      {label[state]}
-    </span>
-  );
+  const current = tone[state];
+
+  return <Chip size="small" label={current.label} color={current.color} variant="outlined" />;
 }
 
 function sleep(ms: number) {
@@ -443,4 +450,29 @@ function sleep(ms: number) {
 function shortHash(hash: string) {
   if (!hash) return "";
   return `${hash.slice(0, 6)}…${hash.slice(-4)}`;
+}
+
+function StatusRow({ label, value }: { label: string; value: string }) {
+  return (
+    <Box
+      sx={{
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 1.5,
+        px: 1.5,
+        py: 1,
+        background: "rgba(255,255,255,0.02)",
+      }}
+    >
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        color="text.primary"
+        sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  );
 }

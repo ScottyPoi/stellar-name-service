@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AppBar, Avatar, Box, Button, IconButton, Stack, Toolbar, Typography } from "@mui/material";
+import { AppBar, Avatar, Box, Button, ButtonBase, IconButton, Stack, Toolbar, Typography } from "@mui/material";
 import { useWallet } from "@/components/wallet/WalletProvider";
 import { MenuSheet } from "./MenuSheet";
 
@@ -36,32 +36,47 @@ export function Header() {
             px: { xs: 2, sm: 3 },
             py: 1.5,
             minHeight: 72,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
           }}
         >
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flex: 1 }}>
-            <Avatar
-              sx={{
-                width: 42,
-                height: 42,
-                background:
-                  "linear-gradient(135deg, rgba(124,155,255,0.9), rgba(192,132,252,0.85))",
-                fontWeight: 800,
-                letterSpacing: 0.5,
-              }}
-            >
-              S
-            </Avatar>
-            <Box>
-              <Typography variant="subtitle1" fontWeight={700} color="text.primary">
-                Stellar Name Service
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Personalized usernames on Stellar
-              </Typography>
-            </Box>
-          </Stack>
+          <ButtonBase
+            component={Link}
+            href="/"
+            sx={{ textAlign: "left", flexShrink: 0 }}
+          >
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Avatar
+                sx={{
+                  width: 42,
+                  height: 42,
+                  background:
+                    "linear-gradient(135deg, rgba(124,155,255,0.9), rgba(192,132,252,0.85))",
+                  fontWeight: 800,
+                  letterSpacing: 0.5,
+                }}
+              >
+                S
+              </Avatar>
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+                  Stellar Name Service
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Personalized usernames on Stellar
+                </Typography>
+              </Box>
+            </Stack>
+          </ButtonBase>
 
-          <Stack direction="row" spacing={1.5} alignItems="center">
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            sx={{ ml: "auto" }}
+          >
             {publicKey ? (
               <>
                 <Button

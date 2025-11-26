@@ -332,7 +332,7 @@ export function RegisterNameCard({ onRegistered }: RegisterNameCardProps) {
             className="w-full rounded-xl border border-slate-700/70 bg-slate-950/80 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:border-sky-500 focus:ring-sky-500/40"
           />
           <p className="text-xs text-slate-500">
-            Defaults to configured resolver ID ({config.resolverId}).
+            This field is pre-filled with the default resolver ID ({config.resolverId}). If left blank, the default resolver will be used.
           </p>
         </div>
       </div>

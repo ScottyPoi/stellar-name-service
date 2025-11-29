@@ -130,7 +130,7 @@ function InfoBlock({
   mono?: boolean;
 }) {
   return (
-    <Grid item xs={12} sm={6}>
+    <Grid size={{ xs: 12, sm: 6 }}>
       <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 0.5 }}>
         {label}
       </Typography>

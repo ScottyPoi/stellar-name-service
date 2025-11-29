@@ -19,6 +19,7 @@ import { StatusBanner } from "@/components/resolver/StatusBanner";
 import { ResultCard } from "@/components/resolver/ResultCard";
 import { NameCard } from "@/components/wallet/NameCard";
 import { RegisterNameCard } from "@/components/wallet/RegisterNameCard";
+import { calculateTimeUntilExpiry } from "@/lib/utils";
 
 type ResolverState = "idle" | "loading" | "success" | "not_found" | "error";
 
@@ -35,32 +36,19 @@ function formatDate(value?: string | null) {
   });
 }
 
-function calculateTimeUntilExpiry(expiresAt: string | null | undefined): string | null {
-  if (!expiresAt) return null;
-  const expiry = new Date(expiresAt);
-  const now = new Date();
-  const diff = expiry.getTime() - now.getTime();
-  
-  if (diff < 0) return "Expired";
-  
-  const months = Math.floor(diff / (1000 * 60 * 60 * 24 * 30));
-  const days = Math.floor((diff % (1000 * 60 * 60 * 24 * 30)) / (1000 * 60 * 60 * 24));
-  
-  if (months > 0) {
-    return `Expires in ${months} ${months === 1 ? "month" : "months"}`;
-  }
-  return `Expires in ${days} ${days === 1 ? "day" : "days"}`;
-}
-
 export default function NameDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { publicKey } = useWallet();
   const fqdn = decodeURIComponent(params.fqdn as string);
-  
-  const [resolverStatus, setResolverStatus] = useState<ResolverState>("loading");
+
+  const [resolverStatus, setResolverStatus] =
+    useState<ResolverState>("loading");
   const [resolverMessage, setResolverMessage] = useState<string | null>(null);
-  const [resolvedData, setResolvedData] = useState<Record<string, unknown> | null>(null);
+  const [resolvedData, setResolvedData] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [nameInfo, setNameInfo] = useState<NameInfo | null>(null);
 
   const lookupName = useCallback(async () => {
@@ -74,12 +62,12 @@ export default function NameDetailsPage() {
       const response = await resolveName(fqdn);
       if (response.status === 200) {
         setResolverStatus("success");
-        const data = {
+        const data: any = {
           fqdn,
           ...(response.data as Record<string, unknown>),
         };
         setResolvedData(data);
-        
+
         // Convert to NameInfo format for NameCard
         setNameInfo({
           fqdn,
@@ -101,7 +89,7 @@ export default function NameDetailsPage() {
       setResolverMessage(
         error instanceof Error
           ? error.message
-          : "Unable to resolve the requested name.",
+          : "Unable to resolve the requested name."
       );
     }
   }, [fqdn]);
@@ -113,9 +101,11 @@ export default function NameDetailsPage() {
   const owner = resolvedData?.owner as string | undefined;
   const isOwnedByUser = publicKey && owner && owner === publicKey;
   const isAvailable = resolverStatus === "not_found";
-  const isOwnedByOther = resolverStatus === "success" && owner && !isOwnedByUser;
-  const suggestedLabel =
-    fqdn?.toLowerCase().endsWith(".stellar") ? fqdn.split(".")[0] : fqdn;
+  const isOwnedByOther =
+    resolverStatus === "success" && owner && !isOwnedByUser;
+  const suggestedLabel = fqdn?.toLowerCase().endsWith(".stellar")
+    ? fqdn.split(".")[0]
+    : fqdn;
 
   function renderStatusBanner() {
     if (resolverStatus === "loading") {
@@ -219,79 +209,90 @@ export default function NameDetailsPage() {
         {resolverStatus === "success" && resolvedData && (
           <Stack spacing={3}>
             <Grid container spacing={2.5}>
-              {owner && (
-                <Grid item xs={12} sm={6} md={4}>
+              {owner ? (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <InfoCard
                     title="Owner"
                     value={owner}
                     helper={
-                      isOwnedByUser ? "You control this name" : "Connected owner on-chain"
+                      isOwnedByUser
+                        ? "You control this name"
+                        : "Connected owner on-chain"
                     }
                   />
                 </Grid>
-              )}
-              {resolvedData.resolver && (
-                <Grid item xs={12} sm={6} md={4}>
-                  <InfoCard title="Resolver" value={resolvedData.resolver as string} />
+              ) : <></> }
+              {resolvedData.resolver ? (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <InfoCard
+                    title="Resolver"
+                    value={resolvedData.resolver as string}
+                  />
                 </Grid>
-              )}
-              {resolvedData.expires_at && (
-                <Grid item xs={12} sm={6} md={4}>
+              ) : <></> }
+              {resolvedData.expires_at ? (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <InfoCard
                     title="Expiry"
                     value={formatDate(resolvedData.expires_at as string) ?? "—"}
-                    helper={calculateTimeUntilExpiry(resolvedData.expires_at as string)}
+                    helper={calculateTimeUntilExpiry(
+                      resolvedData.expires_at as string
+                    )}
                   />
                 </Grid>
-              )}
+              ) : <></> }
             </Grid>
 
-            {resolvedData.records &&
+            {resolvedData.records ? (
               typeof resolvedData.records === "object" &&
-              Object.keys(resolvedData.records as Record<string, string>).length > 0 && (
+              Object.keys(resolvedData.records as Record<string, string>)
+                .length > 0 && (
                 <Card>
                   <CardContent>
                     <Typography variant="h6" fontWeight={700} gutterBottom>
                       Records
                     </Typography>
                     <Stack spacing={1.25}>
-                      {Object.entries(resolvedData.records as Record<string, string>).map(
-                        ([key, value]) => (
-                          <Box
-                            key={key}
-                            sx={{
-                              px: 1.5,
-                              py: 1,
-                              borderRadius: 1.5,
-                              border: "1px solid rgba(255,255,255,0.08)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: 2,
-                              bgcolor: "rgba(255,255,255,0.03)",
-                            }}
+                      {Object.entries(
+                        resolvedData.records as Record<string, string>
+                      ).map(([key, value]) => (
+                        <Box
+                          key={key}
+                          sx={{
+                            px: 1.5,
+                            py: 1,
+                            borderRadius: 1.5,
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 2,
+                            bgcolor: "rgba(255,255,255,0.03)",
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ fontFamily: "monospace" }}
                           >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ fontFamily: "monospace" }}
-                            >
-                              {key}
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              color="text.primary"
-                              sx={{ textAlign: "right", wordBreak: "break-word" }}
-                            >
-                              {value}
-                            </Typography>
-                          </Box>
-                        ),
-                      )}
+                            {key}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="text.primary"
+                            sx={{ textAlign: "right", wordBreak: "break-word" }}
+                          >
+                            {value}
+                          </Typography>
+                        </Box>
+                      ))}
                     </Stack>
                   </CardContent>
                 </Card>
-              )}
+              )
+            ) : (
+              <></>
+            )}
 
             {isOwnedByUser && nameInfo && (
               <Stack spacing={1.5}>
@@ -327,7 +328,11 @@ function InfoCard({
   return (
     <Card>
       <CardContent>
-        <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 0.5 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ letterSpacing: 0.5 }}
+        >
           {title}
         </Typography>
         <Typography
@@ -346,5 +351,3 @@ function InfoCard({
     </Card>
   );
 }
-
-

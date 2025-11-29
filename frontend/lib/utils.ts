@@ -6,11 +6,21 @@ export function calculateTimeUntilExpiry(expiresAt: string | null | undefined): 
     
     if (diff < 0) return "Expired";
     
-    const months = Math.floor(diff / (1000 * 60 * 60 * 24 * 30));
-    const days = Math.floor((diff % (1000 * 60 * 60 * 24 * 30)) / (1000 * 60 * 60 * 24));
+    // Calculate actual calendar months difference
+    let months = (expiry.getFullYear() - now.getFullYear()) * 12 + (expiry.getMonth() - now.getMonth());
+    
+    // If the day of expiry is before the day of now, we haven't reached that month yet
+    if (expiry.getDate() < now.getDate()) {
+      months--;
+    }
+    
+    // Calculate remaining days by creating a date that is 'months' months from now
+    const monthsFromNow = new Date(now);
+    monthsFromNow.setMonth(now.getMonth() + months);
+    const daysRemaining = Math.floor((expiry.getTime() - monthsFromNow.getTime()) / (1000 * 60 * 60 * 24));
     
     if (months > 0) {
       return `Expires in ${months} ${months === 1 ? "month" : "months"}`;
     }
-    return `Expires in ${days} ${days === 1 ? "day" : "days"}`;
+    return `Expires in ${daysRemaining} ${daysRemaining === 1 ? "day" : "days"}`;
   }

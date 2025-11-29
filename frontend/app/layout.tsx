@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/ui/Header";
 import { Footer } from "@/components/ui/Footer";
-import { Container } from "@/components/ui/Container";
-import "./globals.css";
 import { WalletProvider } from "@/components/wallet/WalletProvider";
+import { AppThemeProvider } from "@/components/ui/AppThemeProvider";
+import { Box } from "@mui/material";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Stellar Name Service",
@@ -17,16 +18,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="bg-slate-950 text-slate-100 antialiased">
-        <WalletProvider>
-        <div className="flex min-h-screen flex-col">
-          <Header />
-          <main className="flex-1 py-10">
-            <Container className="space-y-8">{children}</Container>
-          </main>
-          <Footer />
-        </div>
-        </WalletProvider>
+      <body>
+        <AppThemeProvider>
+          <WalletProvider>
+            <Box
+              sx={{
+                minHeight: "100vh",
+                display: "flex",
+                flexDirection: "column",
+                bgcolor: "background.default",
+                color: "text.primary",
+              }}
+            >
+              <Header />
+              <Box component="main" sx={{ flex: 1 }}>{children}</Box>
+              <Footer />
+            </Box>
+          </WalletProvider>
+        </AppThemeProvider>
       </body>
     </html>
   );

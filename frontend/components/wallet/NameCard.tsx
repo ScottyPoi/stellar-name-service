@@ -6,6 +6,18 @@ import {
   BASE_FEE,
   rpc,
 } from "@stellar/stellar-sdk";
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Divider,
+  Grid,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { useWallet } from "./WalletProvider";
 import { type NameInfo } from "@/lib/indexerClient";
 import { config } from "@/lib/config";
@@ -240,93 +252,114 @@ export function NameCard({ name, onRenewed }: NameCardProps) {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-800/70 bg-slate-900/60 p-6 shadow-lg shadow-slate-950/30 flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <h3 className="text-xl font-semibold text-white">{name.fqdn}</h3>
-        {name.namehash && (
-          <p className="font-mono text-xs text-slate-500">namehash: {name.namehash}</p>
+    <Card>
+      <CardHeader
+        title={
+          <Stack spacing={0.5}>
+            <Typography variant="h6" fontWeight={800}>
+              {name.fqdn}
+            </Typography>
+            {name.namehash && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontFamily: "monospace" }}
+              >
+                namehash: {name.namehash}
+              </Typography>
+            )}
+          </Stack>
+        }
+        sx={{ pb: 0 }}
+      />
+      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <Typography variant="caption" color="text.secondary">
+              Owner
+            </Typography>
+            <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>
+              {name.owner ?? "—"}
+            </Typography>
+          </Grid>
+          {name.resolver && (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Typography variant="caption" color="text.secondary">
+                Resolver
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
+              >
+                {name.resolver}
+              </Typography>
+            </Grid>
+          )}
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <Typography variant="caption" color="text.secondary">
+              Expires
+            </Typography>
+            <Typography variant="body2">{formatDate(name.expires_at) ?? "—"}</Typography>
+          </Grid>
+        </Grid>
+
+        {renewStatus && (
+          <Alert severity={statusTone(renewStatus)} variant="outlined">
+            {renewStatus}
+          </Alert>
         )}
-      </div>
-
-      <dl className="grid gap-3 border-t border-slate-800/60 pt-4 text-sm">
-        <div>
-          <dt className="text-slate-400">Owner</dt>
-          <dd className="font-mono text-slate-100 break-all">
-            {name.owner ?? "—"}
-          </dd>
-        </div>
-        {name.resolver && (
-          <div>
-            <dt className="text-slate-400">Resolver</dt>
-            <dd className="font-mono text-slate-100 break-all">
-              {name.resolver}
-            </dd>
-          </div>
+        {transferStatus && (
+          <Alert severity={statusTone(transferStatus)} variant="outlined">
+            {transferStatus}
+          </Alert>
         )}
-        <div>
-          <dt className="text-slate-400">Expires</dt>
-          <dd className="text-slate-100">
-            {formatDate(name.expires_at) ?? "—"}
-          </dd>
-        </div>
-      </dl>
 
-      {renewStatus && (
-        <div className={`text-xs p-2 rounded ${
-          renewStatus.includes("Success") 
-            ? "bg-green-900/20 text-green-400" 
-            : renewStatus.includes("Error") || renewStatus.includes("Missing")
-            ? "bg-red-900/20 text-red-400"
-            : "bg-slate-800/40 text-slate-300"
-        }`}>
-          {renewStatus}
-        </div>
-      )}
-      {transferStatus && (
-        <div className={`text-xs p-2 rounded ${
-          transferStatus.includes("Success") 
-            ? "bg-green-900/20 text-green-400" 
-            : transferStatus.includes("Error") || transferStatus.includes("Missing")
-            ? "bg-red-900/20 text-red-400"
-            : "bg-slate-800/40 text-slate-300"
-        }`}>
-          {transferStatus}
-        </div>
-      )}
+        <Divider />
 
-      <div className="flex flex-col gap-3 mt-auto pt-4 border-t border-slate-800/60">
-        <button
-          onClick={handleRenew}
-          disabled={isRenewing || !publicKey || !name.fqdn || !network}
-          className="flex-1 rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:bg-slate-700/50 disabled:text-slate-400 disabled:cursor-not-allowed"
-          title={!publicKey ? "Connect wallet to renew" : !name.fqdn ? "Name missing" : "Renew this name"}
-        >
-          {isRenewing ? "Renewing..." : "Renew"}
-        </button>
-        <div className="flex gap-2 items-center">
-          <input
-            type="text"
-            value={transferTo}
-            onChange={(e) => setTransferTo(e.target.value)}
-            placeholder="Destination owner address (G...)"
-            className="flex-1 rounded-lg border border-slate-800/70 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60"
-          />
-          <button
-            onClick={handleTransfer}
-            disabled={
-              isTransferring ||
-              !publicKey ||
-              !name.namehash ||
-              !network ||
-              !transferTo.trim()
-            }
-            className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:bg-slate-700/50 disabled:text-slate-400 disabled:cursor-not-allowed"
-            title={!publicKey ? "Connect wallet to transfer" : !name.namehash ? "Namehash missing" : "Transfer this name"}
+        <Stack spacing={1.5}>
+          <Button
+            variant="contained"
+            onClick={handleRenew}
+            disabled={isRenewing || !publicKey || !name.fqdn || !network}
+            sx={{ alignSelf: "flex-start", px: 3 }}
           >
-            {isTransferring ? "Transferring..." : "Transfer Ownership"}
-          </button>
-        </div>
-      </div>
-    </div>
+            {isRenewing ? "Renewing…" : "Renew"}
+          </Button>
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="stretch">
+            <TextField
+              fullWidth
+              size="small"
+              value={transferTo}
+              onChange={(e) => setTransferTo(e.target.value)}
+              placeholder="Destination owner address (G...)"
+            />
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={handleTransfer}
+              disabled={
+                isTransferring ||
+                !publicKey ||
+                !name.namehash ||
+                !network ||
+                !transferTo.trim()
+              }
+              sx={{ px: 3 }}
+            >
+              {isTransferring ? "Transferring…" : "Transfer Ownership"}
+            </Button>
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
   );
+}
+
+function statusTone(message: string): "success" | "error" | "info" {
+  if (message.toLowerCase().includes("success")) return "success";
+  if (message.toLowerCase().includes("error") || message.toLowerCase().includes("missing")) {
+    return "error";
+  }
+  return "info";
 }

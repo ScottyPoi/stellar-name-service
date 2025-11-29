@@ -1,3 +1,15 @@
+import {
+  Box,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  Divider,
+  Grid,
+  Stack,
+  Typography,
+} from "@mui/material";
+
 interface ResultCardProps {
   fqdn: string;
   data: Record<string, unknown>;
@@ -28,62 +40,107 @@ export function ResultCard({ fqdn, data }: ResultCardProps) {
       : [];
 
   return (
-    <div className="motion-safe:animate-fade-in rounded-2xl border border-slate-800/70 bg-slate-900/60 p-6 shadow-lg shadow-slate-950/30">
-      <div className="flex flex-col gap-2 pb-4">
-        <p className="text-xs uppercase tracking-wide text-sky-300">Result</p>
-        <h2 className="text-2xl font-semibold text-white">{fqdn}</h2>
-        {namehash ? (
-          <p className="font-mono text-xs text-slate-500">namehash: {namehash}</p>
-        ) : null}
-      </div>
+    <Card>
+      <CardHeader
+        title={
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Chip
+              label="Result"
+              size="small"
+              color="primary"
+              sx={{ bgcolor: "rgba(124,155,255,0.2)" }}
+            />
+            <Typography variant="h5" fontWeight={800}>
+              {fqdn}
+            </Typography>
+          </Stack>
+        }
+        subheader={
+          namehash ? (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontFamily: "monospace" }}
+            >
+              namehash: {namehash}
+            </Typography>
+          ) : undefined
+        }
+        sx={{ pb: 0 }}
+      />
+      <CardContent>
+        <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
+          <InfoBlock label="Owner" value={owner ?? "—"} mono />
+          <InfoBlock label="Resolver" value={resolver ?? "—"} mono />
+          <InfoBlock label="Address" value={address ?? "—"} mono />
+          <InfoBlock label="Expires" value={formatDate(expiresAt) ?? "—"} />
+        </Grid>
 
-      <dl className="grid gap-4 border-t border-slate-800/60 pt-4 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-slate-400">Owner</dt>
-          <dd className="font-mono text-slate-100">
-            {owner ?? "—"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-slate-400">Resolver</dt>
-          <dd className="font-mono text-slate-100">
-            {resolver ?? "—"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-slate-400">Address</dt>
-          <dd className="font-mono text-slate-100">
-            {address ?? "—"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-slate-400">Expires</dt>
-          <dd className="text-slate-100">
-            {formatDate(expiresAt) ?? "—"}
-          </dd>
-        </div>
-      </dl>
+        <Divider sx={{ my: 3 }} />
 
-      <div className="mt-6 border-t border-slate-800/60 pt-4">
-        <p className="text-sm font-medium text-slate-200">Records</p>
+        <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+          Records
+        </Typography>
         {recordsEntries.length === 0 ? (
-          <p className="text-sm text-slate-500">No records were found.</p>
+          <Typography variant="body2" color="text.secondary">
+            No records were found.
+          </Typography>
         ) : (
-          <ul className="mt-2 space-y-2">
+          <Stack spacing={1.5}>
             {recordsEntries.map(([key, value]) => (
-              <li
+              <Box
                 key={key}
-                className="flex items-center justify-between rounded-lg border border-slate-800/60 bg-slate-950/40 px-3 py-2 text-sm"
+                sx={{
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 1.5,
+                  px: 1.5,
+                  py: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  bgcolor: "rgba(255,255,255,0.03)",
+                }}
               >
-                <span className="font-mono text-xs uppercase tracking-wide text-slate-400">
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontFamily: "monospace", letterSpacing: 0.5 }}
+                >
                   {key}
-                </span>
-                <span className="text-slate-100">{value}</span>
-              </li>
+                </Typography>
+                <Typography variant="body2" color="text.primary">
+                  {value}
+                </Typography>
+              </Box>
             ))}
-          </ul>
+          </Stack>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InfoBlock({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <Grid size={{ xs: 12, sm: 6 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 0.5 }}>
+        {label}
+      </Typography>
+      <Typography
+        variant="body1"
+        color="text.primary"
+        sx={{ fontFamily: mono ? "monospace" : undefined, wordBreak: "break-word" }}
+      >
+        {value}
+      </Typography>
+    </Grid>
   );
 }
